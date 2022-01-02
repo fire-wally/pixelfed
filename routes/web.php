@@ -9,11 +9,18 @@ Route::domain(config('pixelfed.domain.admin'))->prefix('i/admin')->group(functio
 	Route::post('reports/show/{id}', 'AdminController@updateReport');
 	Route::post('reports/bulk', 'AdminController@bulkUpdateReport');
 	Route::get('reports/autospam/{id}', 'AdminController@showSpam');
+	Route::post('reports/autospam/sync', 'AdminController@fixUncategorizedSpam');
 	Route::post('reports/autospam/{id}', 'AdminController@updateSpam');
 	Route::get('reports/autospam', 'AdminController@spam');
 	Route::get('reports/appeals', 'AdminController@appeals');
 	Route::get('reports/appeal/{id}', 'AdminController@showAppeal');
 	Route::post('reports/appeal/{id}', 'AdminController@updateAppeal');
+	Route::get('reports/email-verifications', 'AdminController@reportMailVerifications');
+	Route::post('reports/email-verifications/ignore', 'AdminController@reportMailVerifyIgnore');
+	Route::post('reports/email-verifications/approve', 'AdminController@reportMailVerifyApprove');
+	Route::post('reports/email-verifications/clear-ignored', 'AdminController@reportMailVerifyClearIgnored');
+	Route::redirect('stories', '/stories/list');
+	Route::get('stories/list', 'AdminController@stories')->name('admin.stories');
 	Route::redirect('statuses', '/statuses/list');
 	Route::get('statuses/list', 'AdminController@statuses')->name('admin.statuses');
 	Route::get('statuses/show/{id}', 'AdminController@showStatus');
@@ -40,9 +47,6 @@ Route::domain(config('pixelfed.domain.admin'))->prefix('i/admin')->group(functio
 	Route::get('media/show/{id}', 'AdminController@mediaShow');
 	Route::get('settings', 'AdminController@settings')->name('admin.settings');
 	Route::post('settings', 'AdminController@settingsHomeStore');
-	Route::get('settings/config', 'AdminController@settingsConfig')->name('admin.settings.config');
-	Route::post('settings/config', 'AdminController@settingsConfigStore');
-	Route::post('settings/config/restore', 'AdminController@settingsConfigRestore');
 	Route::get('settings/features', 'AdminController@settingsFeatures')->name('admin.settings.features');
 	Route::get('settings/pages', 'AdminController@settingsPages')->name('admin.settings.pages');
 	Route::get('settings/pages/edit', 'PageController@edit')->name('admin.settings.pages.edit');
@@ -77,18 +81,16 @@ Route::domain(config('pixelfed.domain.admin'))->prefix('i/admin')->group(functio
 	Route::post('newsroom/edit/{id}', 'AdminController@newsroomUpdate');
 	Route::delete('newsroom/edit/{id}', 'AdminController@newsroomDelete');
 	Route::post('newsroom/create', 'AdminController@newsroomStore');
+
+	Route::get('diagnostics/home', 'AdminController@diagnosticsHome')->name('admin.diagnostics');
+	Route::post('diagnostics/decrypt', 'AdminController@diagnosticsDecrypt')->name('admin.diagnostics.decrypt');
 });
 
-Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofactor', 'localization','interstitial'])->group(function () {
+Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofactor', 'localization'])->group(function () {
 	Route::get('/', 'SiteController@home')->name('timeline.personal');
 	Route::post('/', 'StatusController@store');
 
 	Auth::routes();
-
-	Route::get('.well-known/webfinger', 'FederationController@webfinger')->name('well-known.webfinger');
-	Route::get('.well-known/nodeinfo', 'FederationController@nodeinfoWellKnown')->name('well-known.nodeinfo');
-	Route::get('.well-known/host-meta', 'FederationController@hostMeta')->name('well-known.hostMeta');
-	Route::redirect('.well-known/change-password', '/settings/password');
 
 	Route::get('/home', 'HomeController@index')->name('home');
 
@@ -100,8 +102,9 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 
 	Route::group(['prefix' => 'api'], function () {
 		Route::get('search', 'SearchController@searchAPI');
-		Route::get('nodeinfo/2.0.json', 'FederationController@nodeinfo');
 		Route::post('status/view', 'StatusController@storeView');
+		Route::get('v1/polls/{id}', 'PollController@getPoll');
+		Route::post('v1/polls/{id}/votes', 'PollController@vote');
 
 		Route::group(['prefix' => 'compose'], function() {
 			Route::group(['prefix' => 'v0'], function() {
@@ -116,6 +119,8 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 				Route::post('/publish', 'ComposeController@store');
 				Route::post('/publish/text', 'ComposeController@storeText');
 				Route::get('/media/processing', 'ComposeController@mediaProcessingCheck');
+				Route::get('/settings', 'ComposeController@composeSettings');
+				Route::post('/poll', 'ComposeController@createPoll');
 			});
 		});
 
@@ -196,7 +201,16 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 				Route::get('discover/posts/places', 'DiscoverController@trendingPlaces');
 				Route::get('seasonal/yir', 'SeasonalController@getData');
 				Route::post('seasonal/yir', 'SeasonalController@store');
+				Route::post('status/{id}/archive', 'ApiController@archive');
+				Route::post('status/{id}/unarchive', 'ApiController@unarchive');
+				Route::get('statuses/archives', 'ApiController@archivedPosts');
+				Route::get('mutes', 'AccountController@accountMutesV2');
+				Route::get('blocks', 'AccountController@accountBlocksV2');
+				Route::get('filters', 'AccountController@accountFiltersV2');
 			});
+
+			Route::get('discover/accounts/popular', 'Api\ApiV1Controller@discoverAccountsPopular');
+			Route::post('web/change-language.json', 'SpaController@updateLanguage');
 		});
 
 		Route::group(['prefix' => 'local'], function () {
@@ -221,19 +235,24 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 		Route::group(['prefix' => 'admin'], function () {
 			Route::post('moderate', 'Api\AdminApiController@moderate');
 		});
-		Route::group(['prefix' => 'stories'], function () {
-			Route::get('v0/recent', 'StoryController@apiV1Recent');
-			Route::post('v0/add', 'StoryController@apiV1Add');
-			Route::get('v0/fetch/{id}', 'StoryController@apiV1Fetch');
-			Route::get('v0/profile/{id}', 'StoryController@apiV1Profile');
-			Route::get('v0/exists/{id}', 'StoryController@apiV1Exists');
-			Route::delete('v0/delete/{id}', 'StoryController@apiV1Delete');
-			Route::get('v0/me', 'StoryController@apiV1Me');
-			Route::get('v0/item/{id}', 'StoryController@apiV1Item');
-			Route::post('v0/crop', 'StoryController@cropPhoto');
-    		Route::post('v0/publish', 'StoryController@publishStory');
-		});
 
+		Route::group(['prefix' => 'web/stories'], function () {
+			Route::get('v1/recent', 'StoryController@recent');
+			Route::get('v1/viewers', 'StoryController@viewers');
+			Route::get('v1/profile/{id}', 'StoryController@profile');
+			Route::get('v1/exists/{id}', 'StoryController@exists');
+			Route::get('v1/poll/results', 'StoryController@pollResults');
+			Route::post('v1/viewed', 'StoryController@viewed');
+			Route::post('v1/react', 'StoryController@react');
+			Route::post('v1/comment', 'StoryController@comment');
+			Route::post('v1/publish/poll', 'StoryController@publishStoryPoll');
+			Route::post('v1/poll/vote', 'StoryController@storyPollVote');
+			Route::post('v1/report', 'StoryController@storeReport');
+			Route::post('v1/add', 'StoryController@apiV1Add');
+			Route::post('v1/crop', 'StoryController@cropPhoto');
+			Route::post('v1/publish', 'StoryController@publishStory');
+			Route::delete('v1/delete/{id}', 'StoryController@apiV1Delete');
+		});
 	});
 
 	Route::get('discover/tags/{hashtag}', 'DiscoverController@showTags');
@@ -259,6 +278,8 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 
 		Route::get('verify-email', 'AccountController@verifyEmail');
 		Route::post('verify-email', 'AccountController@sendVerifyEmail');
+		Route::get('verify-email/request', 'InternalApiController@requestEmailVerification');
+		Route::post('verify-email/request', 'InternalApiController@requestEmailVerificationStore');
 		Route::get('confirm-email/{userToken}/{randomToken}', 'AccountController@confirmVerifyEmail');
 
 		Route::get('auth/sudo', 'AccountController@sudoMode');
@@ -293,7 +314,7 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 
 		Route::get('me', 'ProfileController@meRedirect');
 		Route::get('intent/follow', 'SiteController@followIntent');
-		Route::post('stories/viewed', 'StoryController@apiV1Viewed');
+		Route::get('rs/{id}', 'StoryController@remoteStory');
 		Route::get('stories/new', 'StoryController@compose');
 		Route::get('my/story', 'StoryController@iRedirect');
 		Route::get('web/profile/_/{id}', 'InternalApiController@remoteProfile');
@@ -315,6 +336,12 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 		Route::get('warning', 'AccountInterstitialController@get');
 		Route::post('warning', 'AccountInterstitialController@read');
 		Route::get('my2020', 'SeasonalController@yearInReview');
+
+		Route::get('web/username/{id}', 'SpaController@usernameRedirect');
+		Route::get('web/post/{id}', 'SpaController@webPost');
+		Route::get('web/profile/{id}', 'SpaController@webProfile');
+		Route::get('web/{q}', 'SpaController@index')->where('q', '.*');
+		Route::get('web', 'SpaController@index');
 	});
 
 	Route::group(['prefix' => 'account'], function () {
@@ -423,6 +450,11 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 			Route::get('/', 'ImportController@mastodon')->name('settings.import.mastodon');
 		  });
 		});
+
+		Route::get('timeline', 'SettingsController@timelineSettings')->name('settings.timeline');
+		Route::post('timeline', 'SettingsController@updateTimelineSettings');
+		Route::get('media', 'SettingsController@mediaSettings')->name('settings.media');
+		Route::post('media', 'SettingsController@updateMediaSettings');
 	});
 
 	Route::group(['prefix' => 'site'], function () {

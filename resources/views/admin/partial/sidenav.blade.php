@@ -37,6 +37,13 @@
 					</li>
 
 					<li class="nav-item">
+						<a class="nav-link {{request()->is('*stories*')?'active':''}}" href="{{route('admin.stories')}}">
+							<i class="ni ni-bold-right text-primary"></i>
+							<span class="nav-link-text">Stories <span class="badge badge-primary ml-1">NEW</span></span>
+						</a>
+					</li>
+
+					<li class="nav-item">
 						<a class="nav-link {{request()->is('*users*')?'active':''}}" href="{{route('admin.users')}}">
 							<i class="ni ni-bold-right text-primary"></i>
 							<span class="nav-link-text">Users</span>
@@ -49,8 +56,6 @@
 							<span class="nav-link-text">Settings</span>
 						</a>
 					</li>
-
-
 				</ul>
 
 				<hr class="my-3">
@@ -65,9 +70,23 @@
 					</li>
 
 					<li class="nav-item">
+						<a class="nav-link {{request()->is('*diagnostics*')?'active':''}}" href="{{route('admin.diagnostics')}}">
+							<i class="ni ni-bold-right text-primary"></i>
+							<span class="nav-link-text">Diagnostics <span class="badge badge-primary ml-1">NEW</span></span>
+						</a>
+					</li>
+
+					<li class="nav-item">
 						<a class="nav-link {{request()->is('*hashtags*')?'active':''}}" href="{{route('admin.hashtags')}}">
 							<i class="ni ni-bold-right text-primary"></i>
 							<span class="nav-link-text">Hashtags</span>
+						</a>
+					</li>
+
+					<li class="nav-item">
+						<a class="nav-link" href="/horizon">
+							<i class="ni ni-bold-right text-primary"></i>
+							<span class="nav-link-text">Horizon</span>
 						</a>
 					</li>
 

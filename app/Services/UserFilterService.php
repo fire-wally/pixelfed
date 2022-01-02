@@ -54,7 +54,7 @@ class UserFilterService {
 
 	public static function filters(int $profile_id) : array
 	{
-		return array_merge(self::mutes($profile_id), self::blocks($profile_id));
+		return array_unique(array_merge(self::mutes($profile_id), self::blocks($profile_id)));
 	}
 
 	public static function mute(int $profile_id, int $muted_id)
@@ -97,5 +97,15 @@ class UserFilterService {
 			Redis::zrem($key, $blocked_id);
 		}
 		return $exists;
+	}
+
+	public static function blockCount(int $profile_id)
+	{
+		return Redis::zcard(self::USER_BLOCKS_KEY . $profile_id);
+	}
+
+	public static function muteCount(int $profile_id)
+	{
+		return Redis::zcard(self::USER_MUTES_KEY . $profile_id);
 	}
 }

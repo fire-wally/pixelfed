@@ -6,13 +6,16 @@ use App\Jobs\ImageOptimizePipeline\ImageOptimize;
 use App\Jobs\StatusPipeline\NewStatusPipeline;
 use App\Jobs\StatusPipeline\StatusDelete;
 use App\Jobs\SharePipeline\SharePipeline;
+use App\Jobs\SharePipeline\UndoSharePipeline;
 use App\AccountInterstitial;
 use App\Media;
 use App\Profile;
 use App\Status;
+use App\StatusArchived;
 use App\StatusView;
 use App\Transformer\ActivityPub\StatusTransformer;
 use App\Transformer\ActivityPub\Verb\Note;
+use App\Transformer\ActivityPub\Verb\Question;
 use App\User;
 use Auth, DB, Cache;
 use Illuminate\Http\Request;
@@ -25,7 +28,7 @@ use App\Util\Media\License;
 
 class StatusController extends Controller
 {
-	public function show(Request $request, $username, int $id)
+	public function show(Request $request, $username, $id)
 	{
 		$user = Profile::whereNull('domain')->whereUsername($username)->firstOrFail();
 
@@ -80,16 +83,7 @@ class StatusController extends Controller
 
 	public function shortcodeRedirect(Request $request, $id)
 	{
-		abort_if(strlen($id) < 5, 404);
-		if(!Auth::check()) {
-			return redirect('/login?next='.urlencode('/' . $request->path()));
-		}
-		$id = HashidService::decode($id);
-		$status = Status::find($id);
-		if(!$status) {
-			return redirect('/404');
-		}
-		return redirect($status->url());
+		abort(404);
 	}
 
 	public function showId(int $id)
@@ -214,7 +208,7 @@ class StatusController extends Controller
 		Cache::forget('_api:statuses:recent_9:' . $status->profile_id);
 		Cache::forget('profile:status_count:' . $status->profile_id);
 		Cache::forget('profile:embed:' . $status->profile_id);
-		StatusService::del($status->id);
+		StatusService::del($status->id, true);
 		if ($status->profile_id == $user->profile->id || $user->is_admin == true) {
 			Cache::forget('profile:status_count:'.$status->profile_id);
 			StatusDelete::dispatch($status);
@@ -237,21 +231,20 @@ class StatusController extends Controller
 
 		$user = Auth::user();
 		$profile = $user->profile;
-		$status = Status::withCount('shares')
-			->whereIn('scope', ['public', 'unlisted'])
+		$status = Status::whereIn('scope', ['public', 'unlisted'])
 			->findOrFail($request->input('item'));
 
-		$count = $status->shares()->count();
+		$count = $status->reblogs_count;
 
 		$exists = Status::whereProfileId(Auth::user()->profile->id)
 				  ->whereReblogOfId($status->id)
-				  ->count();
-		if ($exists !== 0) {
+				  ->exists();
+		if ($exists == true) {
 			$shares = Status::whereProfileId(Auth::user()->profile->id)
 				  ->whereReblogOfId($status->id)
 				  ->get();
 			foreach ($shares as $share) {
-				$share->delete();
+				UndoSharePipeline::dispatch($share);
 				$count--;
 			}
 		} else {
@@ -262,11 +255,6 @@ class StatusController extends Controller
 			$share->save();
 			$count++;
 			SharePipeline::dispatch($share);
-		}
-
-		if($count >= 0) {
-			$status->reblogs_count = $count;
-			$status->save();
 		}
 
 		Cache::forget('status:'.$status->id.':sharedby:userid:'.$user->id);
@@ -283,8 +271,9 @@ class StatusController extends Controller
 
 	public function showActivityPub(Request $request, $status)
 	{
+		$object = $status->type == 'poll' ? new Question() : new Note();
 		$fractal = new Fractal\Manager();
-		$resource = new Fractal\Resource\Item($status, new Note());
+		$resource = new Fractal\Resource\Item($status, $object);
 		$res = $fractal->createData($resource)->toArray();
 
 		return response()->json($res['data'], 200, ['Content-Type' => 'application/activity+json'], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
@@ -369,6 +358,8 @@ class StatusController extends Controller
 		if($photos >= 1 && $videos >= 1) {
 			return 'photo:video:album';
 		}
+
+		return 'text';
 	}
 
 	public function toggleVisibility(Request $request) {

@@ -7,7 +7,9 @@ use App\Following;
 use App\ProfileSponsor;
 use App\Report;
 use App\UserFilter;
+use App\UserSetting;
 use Auth, Cookie, DB, Cache, Purify;
+use Illuminate\Support\Facades\Redis;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -20,6 +22,7 @@ use App\Http\Controllers\Settings\{
 	SecuritySettings
 };
 use App\Jobs\DeletePipeline\DeleteAccountPipeline;
+use App\Jobs\MediaPipeline\MediaSyncLicensePipeline;
 
 class SettingsController extends Controller
 {
@@ -220,7 +223,97 @@ class SettingsController extends Controller
 		$sponsors->sponsors = json_encode($res);
 		$sponsors->save();
 		$sponsors = $res;
-		return redirect(route('settings'))->with('status', 'Sponsor settings successfully updated!');;
+		return redirect(route('settings'))->with('status', 'Sponsor settings successfully updated!');
+	}
+
+	public function timelineSettings(Request $request)
+	{
+		$pid = $request->user()->profile_id;
+		$top = Redis::zscore('pf:tl:top', $pid) != false;
+		$replies = Redis::zscore('pf:tl:replies', $pid) != false;
+		return view('settings.timeline', compact('top', 'replies'));
+	}
+
+	public function updateTimelineSettings(Request $request)
+	{
+		$pid = $request->user()->profile_id;
+		$top = $request->has('top') && $request->input('top') === 'on';
+		$replies = $request->has('replies') && $request->input('replies') === 'on';
+
+		if($top) {
+			Redis::zadd('pf:tl:top', $pid, $pid);
+		} else {
+			Redis::zrem('pf:tl:top', $pid);
+		}
+
+		if($replies) {
+			Redis::zadd('pf:tl:replies', $pid, $pid);
+		} else {
+			Redis::zrem('pf:tl:replies', $pid);
+		}
+		return redirect(route('settings'))->with('status', 'Timeline settings successfully updated!');;
+	}
+
+	public function mediaSettings(Request $request)
+	{
+		$setting = UserSetting::whereUserId($request->user()->id)->firstOrFail();
+		$compose = $setting->compose_settings ? json_decode($setting->compose_settings, true) : [
+			'default_license' => null,
+			'media_descriptions' => false
+		];
+		return view('settings.media', compact('compose'));
+	}
+
+	public function updateMediaSettings(Request $request)
+	{
+		$this->validate($request, [
+			'default' => 'required|int|min:1|max:16',
+			'sync' => 'nullable',
+			'media_descriptions' => 'nullable'
+		]);
+
+		$license = $request->input('default');
+		$sync = $request->input('sync') == 'on';
+		$media_descriptions = $request->input('media_descriptions') == 'on';
+		$uid = $request->user()->id;
+
+		$setting = UserSetting::whereUserId($uid)->firstOrFail();
+		$compose = json_decode($setting->compose_settings, true);
+		$changed = false;
+
+		if($sync) {
+			$key = 'pf:settings:mls_recently:'.$uid;
+			if(Cache::get($key) == 2) {
+				$msg = 'You can only sync licenses twice per 24 hours. Try again later.';
+				return redirect(route('settings'))
+					->with('error', $msg);
+			}
+		}
+
+		if(!isset($compose['default_license']) || $compose['default_license'] !== $license) {
+			$compose['default_license'] = (int) $license;
+			$changed = true;
+		}
+
+		if(!isset($compose['media_descriptions']) || $compose['media_descriptions'] !== $media_descriptions) {
+			$compose['media_descriptions'] = $media_descriptions;
+			$changed = true;
+		}
+
+		if($changed) {
+			$setting->compose_settings = json_encode($compose);
+			$setting->save();
+			Cache::forget('profile:compose:settings:' . $request->user()->id);
+		}
+
+		if($sync) {
+			$val = Cache::has($key) ? 2 : 1;
+			Cache::put($key, $val, 86400);
+			MediaSyncLicensePipeline::dispatch($uid, $license);
+			return redirect(route('settings'))->with('status', 'Media licenses successfully synced! It may take a few minutes to take effect for every post.');
+		}
+
+		return redirect(route('settings'))->with('status', 'Media settings successfully updated!');
 	}
 
 }

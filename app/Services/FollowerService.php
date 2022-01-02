@@ -3,69 +3,115 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Redis;
-
+use Cache;
+use DB;
 use App\{
 	Follower,
-	Profile
+	Profile,
+	User
 };
 
-class FollowerService {
+class FollowerService
+{
+	const CACHE_KEY = 'pf:services:followers:';
+	const FOLLOWING_KEY = 'pf:services:follow:following:id:';
+	const FOLLOWERS_KEY = 'pf:services:follow:followers:id:';
 
-	protected $profile;
-	public static $follower_prefix = 'px:profile:followers-v1.3:';
-	public static $following_prefix = 'px:profile:following-v1.3:';
-
-	public static function build()
+	public static function add($actor, $target)
 	{
-		return new self();
+		RelationshipService::refresh($actor, $target);
+		Redis::zadd(self::FOLLOWING_KEY . $actor, $target, $target);
+		Redis::zadd(self::FOLLOWERS_KEY . $target, $actor, $actor);
 	}
 
-	public function profile(Profile $profile)
+	public static function remove($actor, $target)
 	{
-		$this->profile = $profile;
-		self::$follower_prefix .= $profile->id;
-		self::$following_prefix .= $profile->id;
-		return $this;
+		RelationshipService::refresh($actor, $target);
+		Redis::zrem(self::FOLLOWING_KEY . $actor, $target);
+		Redis::zrem(self::FOLLOWERS_KEY . $target, $actor);
+		Cache::forget('pf:services:follow:audience:' . $actor);
+		Cache::forget('pf:services:follow:audience:' . $target);
 	}
 
-	public function followers($limit = 100, $offset = 1)
+	public static function followers($id, $start = 0, $stop = 10)
 	{
-		if(Redis::zcard(self::$follower_prefix) == 0) {
-			$followers = $this->profile->followers()->pluck('profile_id');
-			$followers->map(function($i) {
-				Redis::zadd(self::$follower_prefix, $i, $i);
-			});
-			return Redis::zrevrange(self::$follower_prefix, $offset, $limit);
-		} else {
-			return Redis::zrevrange(self::$follower_prefix, $offset, $limit);
-		}
+		return Redis::zrange(self::FOLLOWERS_KEY . $id, $start, $stop);
 	}
 
-
-	public function following($limit = 100, $offset = 1)
+	public static function following($id, $start = 0, $stop = 10)
 	{
-		if(Redis::zcard(self::$following_prefix) == 0) {
-			$following = $this->profile->following()->pluck('following_id');
-			$following->map(function($i) {
-				Redis::zadd(self::$following_prefix, $i, $i);
-			});
-			return Redis::zrevrange(self::$following_prefix, $offset, $limit);
-		} else {
-			return Redis::zrevrange(self::$following_prefix, $offset, $limit);
-		}
+		return Redis::zrange(self::FOLLOWING_KEY . $id, $start, $stop);
 	}
 
 	public static function follows(string $actor, string $target)
 	{
-		$key = self::$follower_prefix . $target;
-		if(Redis::zcard($key) == 0) {
-			$p = Profile::findOrFail($target);
-			self::build()->profile($p)->followers(1);
-			self::build()->profile($p)->following(1);
-			return (bool) Redis::zrank($key, $actor);
-		} else {
-			return (bool) Redis::zrank($key, $actor);
-		}
+		return Follower::whereProfileId($actor)->whereFollowingId($target)->exists();
+	}
+
+	public static function audience($profile, $scope = null)
+	{
+		return (new self)->getAudienceInboxes($profile, $scope);
+	}
+
+	public static function softwareAudience($profile, $software = 'pixelfed')
+	{
+		return collect(self::audience($profile))
+			->filter(function($inbox) use($software) {
+				$domain = parse_url($inbox, PHP_URL_HOST);
+				if(!$domain) {
+					return false;
+				}
+				return InstanceService::software($domain) === strtolower($software);
+			})
+			->unique()
+			->values()
+			->toArray();
+	}
+
+	protected function getAudienceInboxes($pid, $scope = null)
+	{
+		$key = 'pf:services:follow:audience:' . $pid;
+		return Cache::remember($key, 86400, function() use($pid) {
+			$profile = Profile::find($pid);
+			if(!$profile) {
+				return [];
+			}
+			return $profile
+				->followers()
+				->whereLocalProfile(false)
+				->get()
+				->map(function($follow) {
+					return $follow->sharedInbox ?? $follow->inbox_url;
+				})
+				->unique()
+				->values()
+				->toArray();
+		});
+	}
+
+	public static function mutualCount($pid, $mid)
+	{
+		return Cache::remember(self::CACHE_KEY . ':mutualcount:' . $pid . ':' . $mid, 3600, function() use($pid, $mid) {
+			return DB::table('followers as u')
+				->join('followers as s', 'u.following_id', '=', 's.following_id')
+				->where('s.profile_id', $mid)
+				->where('u.profile_id', $pid)
+				->count();
+		});
+	}
+
+	public static function mutualIds($pid, $mid, $limit = 3)
+	{
+		$key = self::CACHE_KEY . ':mutualids:' . $pid . ':' . $mid . ':limit_' . $limit;
+		return Cache::remember($key, 3600, function() use($pid, $mid, $limit) {
+			return DB::table('followers as u')
+				->join('followers as s', 'u.following_id', '=', 's.following_id')
+				->where('s.profile_id', $mid)
+				->where('u.profile_id', $pid)
+				->limit($limit)
+				->pluck('s.following_id')
+				->toArray();
+		});
 	}
 
 }

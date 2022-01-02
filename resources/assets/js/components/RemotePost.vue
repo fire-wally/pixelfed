@@ -9,14 +9,33 @@
 			<p class="text-center font-weight-bold"><a href="#" class="btn btn-primary font-weight-bold px-5" @click.prevent="warning = false; fetchData()">View Status</a></p>
 		</div>
 	</div>
-	<div v-if="loaded && warning == false" class="postComponent">
+	<div v-if="loaded && warning == false && currentLayout === 'status'" class="postComponent">
 		<div class="container px-0">
-			<div class="card card-md-rounded-0 status-container orientation-unknown shadow-none border">
+
+			<div v-if="status.pf_type === 'text'" class="col-12 col-md-6 offset-md-3">
+					<status-card
+							class="border-top"
+							:status="status"
+							:recommended="false"
+							v-on:comment-focus="commentFocus" />
+
+							<comment-feed :status="status" class="mt-3" />
+
+			</div>
+
+			<div v-if="status.pf_type === 'poll'" class="col-12 col-md-6 offset-md-3">
+					<poll-card :status="status" :profile="profile" :fetch-state="true"/>
+
+					<comment-feed :status="status" class="mt-3" />
+
+			</div>
+
+			<div v-else class="card card-md-rounded-0 status-container orientation-unknown shadow-none border">
 				<div class="row px-0 mx-0">
 				<div class="d-flex d-md-none align-items-center justify-content-between card-header bg-white w-100">
 					<div class="d-flex">
 						<div class="status-avatar mr-2" @click="redirect(profileUrl)">
-							<img :src="statusAvatar" width="24px" height="24px" style="border-radius:12px;" class="cursor-pointer">
+							<img :src="statusAvatar" width="24px" height="24px" style="border-radius:12px;" class="cursor-pointer" onerror="this.onerror=null;this.src='/storage/avatars/default.jpg?v=0';">
 						</div>
 						<div class="username">
 							<span class="username-link font-weight-bold text-dark cursor-pointer" @click="redirect(profileUrl)">{{ statusUsername }}</span>
@@ -46,23 +65,23 @@
 					<div class="col-12 col-md-8 px-0 mx-0">
 							<div class="postPresenterContainer d-none d-flex justify-content-center align-items-center" style="background: #000;">
 								<div v-if="status.pf_type === 'photo'" class="w-100">
-									<photo-presenter :status="status"></photo-presenter>
+									<photo-presenter :status="status" v-on:togglecw="status.sensitive = false"></photo-presenter>
 								</div>
 
 								<div v-else-if="status.pf_type === 'video'" class="w-100">
-									<video-presenter :status="status"></video-presenter>
+									<video-presenter :status="status" v-on:togglecw="status.sensitive = false"></video-presenter>
 								</div>
 
 								<div v-else-if="status.pf_type === 'photo:album'" class="w-100">
-									<photo-album-presenter :status="status"></photo-album-presenter>
+									<photo-album-presenter :status="status" v-on:togglecw="status.sensitive = false"></photo-album-presenter>
 								</div>
 
 								<div v-else-if="status.pf_type === 'video:album'" class="w-100">
-									<video-album-presenter :status="status"></video-album-presenter>
+									<video-album-presenter :status="status" v-on:togglecw="status.sensitive = false"></video-album-presenter>
 								</div>
 
 								<div v-else-if="status.pf_type === 'photo:video:album'" class="w-100">
-									<mixed-album-presenter :status="status"></mixed-album-presenter>
+									<mixed-album-presenter :status="status" v-on:togglecw="status.sensitive = false"></mixed-album-presenter>
 								</div>
 
 								<div v-else class="w-100">
@@ -75,7 +94,7 @@
 						<div class="d-md-flex d-none align-items-center justify-content-between card-header py-3 bg-white">
 							<div class="d-flex align-items-center status-username text-truncate">
 								<div class="status-avatar mr-2" @click="redirect(profileUrl)">
-									<img :src="statusAvatar" width="24px" height="24px" style="border-radius:12px;" class="cursor-pointer">
+									<img :src="statusAvatar" width="24px" height="24px" style="border-radius:12px;" class="cursor-pointer" onerror="this.onerror=null;this.src='/storage/avatars/default.jpg?v=0';">
 								</div>
 								<div class="username">
 									<span class="username-link font-weight-bold text-dark cursor-pointer" @click="redirect(profileUrl)">{{ statusUsername }}</span>
@@ -106,12 +125,12 @@
 							<div class="card-body status-comments pt-0">
 								<div class="status-comment">
 									<div v-if="status.content.length" class="pt-3">
-										<div v-if="showCaption != true">
+										<div v-if="status.sensitive">
 											<span class="py-3">
 												<a class="text-dark font-weight-bold mr-1" :href="profileUrl" v-bind:title="status.account.username">{{truncate(status.account.username,15)}}</a>
 												<span class="text-break">
 													<span class="font-italic text-muted">This comment may contain sensitive material</span>
-													<span class="text-primary cursor-pointer pl-1" @click="showCaption = true">Show</span>
+													<span class="text-primary cursor-pointer pl-1" @click="status.sensitive = false">Show</span>
 												</span>
 											</span>
 										</div>
@@ -138,7 +157,7 @@
 											</p>
 											<div class="comments mt-3">
 												<div v-for="(reply, index) in results" class="pb-4 media" :key="'tl' + reply.id + '_' + index">
-													<img :src="reply.account.avatar" class="rounded-circle border mr-3" width="42px" height="42px">
+													<img :src="reply.account.avatar" class="rounded-circle border mr-3" width="42px" height="42px" onerror="this.onerror=null;this.src='/storage/avatars/default.jpg?v=0';">
 													<div class="media-body">
 														<div v-if="reply.sensitive == true">
 															<span class="py-3">
@@ -171,7 +190,7 @@
 															</div>
 															<div v-if="reply.thread == true" class="comment-thread">
 																<div v-for="(s, sindex) in reply.replies" class="pb-3 media" :key="'cr' + s.id + '_' + index">
-																	<img :src="s.account.avatar" class="rounded-circle border mr-3" width="25px" height="25px">
+																	<img :src="s.account.avatar" class="rounded-circle border mr-3" width="25px" height="25px" onerror="this.onerror=null;this.src='/storage/avatars/default.jpg?v=0';">
 																	<div class="media-body">
 																		<p class="d-flex justify-content-between align-items-top read-more" style="overflow-y: hidden;">
 																			<span>
@@ -213,13 +232,15 @@
 									<h3 v-if="status.visibility == 'public'" v-bind:class="[reactions.bookmarked ? 'fas fa-bookmark text-warning m-0 mr-3 cursor-pointer' : 'far fa-bookmark m-0 mr-3 cursor-pointer']" title="Bookmark" v-on:click="bookmarkStatus"></h3>
 									<h3 v-if="status.visibility == 'public'" v-bind:class="[reactions.shared ? 'fas fa-retweet m-0 text-primary cursor-pointer' : 'fas fa-retweet m-0 share-btn cursor-pointer']" title="Share" v-on:click="shareStatus"></h3>
 								</div>
-								<div class="reaction-counts font-weight-bold mb-0">
-									<span style="cursor:pointer;" v-on:click="likesModal">
-										<span class="like-count">{{status.favourites_count || 0}}</span> likes
-									</span>
-									<span v-if="status.visibility == 'public'" class="float-right" style="cursor:pointer;" v-on:click="sharesModal">
-										<span class="share-count pl-4">{{status.reblogs_count || 0}}</span> shares
-									</span>
+								<div class="reaction-counts mb-0">
+									<div v-if="status.liked_by.username && status.liked_by.username !== user.username" class="likes mb-1">
+										<span class="like-count">Liked by
+											<a class="font-weight-bold text-dark" :href="status.liked_by.url">{{status.liked_by.username}}</a>
+											<span v-if="status.liked_by.others == true">
+												and <span class="font-weight-bold text-dark cursor-pointer" @click="likesModal"><span v-if="status.liked_by.total_count_pretty">{{status.liked_by.total_count_pretty}}</span> others</span>
+											</span>
+										</span>
+									</div>
 								</div>
 								<div class="timestamp pt-2 d-flex align-items-bottom justify-content-between">
 									<a v-bind:href="statusUrl" class="small text-muted" :title="status.created_at">
@@ -242,6 +263,7 @@
 
 				</div>
 			</div>
+
 			<div class="container" v-if="showProfileMorePosts">
 				<p class="text-lighter px-3 mt-5" style="font-weight: 600;font-size: 15px;">More posts from <a :href="profileUrl" class="text-dark">{{this.statusUsername}}</a></p>
 				<div class="profile-timeline mt-md-4">
@@ -275,6 +297,14 @@
 		</div>
 	</div>
 
+	<comment-card
+			v-if="currentLayout === 'comments'"
+			:status="status"
+			:profile="profile"
+			v-on:current-layout="setCurrentLayout"
+			:backToStatus="true"
+			/>
+
 	<b-modal ref="likesModal"
 		id="l-modal"
 		hide-footer
@@ -285,7 +315,7 @@
 			<div class="list-group-item border-0 py-1" v-for="(user, index) in likes" :key="'modal_likes_'+index">
 				<div class="media">
 					<a :href="user.url">
-						<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px">
+						<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px" onerror="this.onerror=null;this.src='/storage/avatars/default.jpg?v=0';">
 					</a>
 					<div class="media-body">
 						<p class="mb-0" style="font-size: 14px">
@@ -318,7 +348,7 @@
 			<div class="list-group-item border-0 py-1" v-for="(user, index) in shares" :key="'modal_shares_'+index">
 				<div class="media">
 					<a :href="user.url">
-						<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px">
+						<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px" onerror="this.onerror=null;this.src='/storage/avatars/default.jpg?v=0';">
 					</a>
 					<div class="media-body">
 						<div class="d-inline-block">
@@ -352,7 +382,7 @@
 			<div class="list-group-item border-0 py-1" v-for="(taguser, index) in status.taggedPeople" :key="'modal_taggedpeople_'+index">
 				<div class="media">
 					<a :href="'/'+taguser.username">
-						<img class="mr-3 rounded-circle box-shadow" :src="taguser.avatar" :alt="taguser.username + '’s avatar'" width="30px">
+						<img class="mr-3 rounded-circle box-shadow" :src="taguser.avatar" :alt="taguser.username + '’s avatar'" width="30px" onerror="this.onerror=null;this.src='/storage/avatars/default.jpg?v=0';">
 					</a>
 					<div class="media-body">
 						<p class="pt-1 d-flex justify-content-between" style="font-size: 14px">
@@ -521,6 +551,11 @@
 
 pixelfed.postComponent = {};
 
+import StatusCard from './partials/StatusCard.vue';
+import CommentCard from './partials/CommentCard.vue';
+import PollCard from './partials/PollCard.vue';
+import CommentFeed from './partials/CommentFeed.vue';
+
 export default {
 		props: [
 			'status-id',
@@ -532,12 +567,21 @@ export default {
 			'status-profile-id',
 			'profile-layout'
 		],
+
+		components: {
+			StatusCard,
+			CommentCard,
+			CommentFeed,
+			PollCard
+		},
+
 		data() {
 				return {
 						config: window.App.config,
 						status: false,
 						media: {},
 						user: false,
+						profile: false,
 						reactions: {
 							liked: false,
 							shared: false
@@ -573,10 +617,14 @@ export default {
 						replySending: false,
 						reactionBarLoading: true,
 						profileUrl: null,
+						currentLayout: 'status'
 					}
 		},
 
 		mounted() {
+			axios.get('/api/pixelfed/v1/accounts/verify_credentials').then(res => {
+				this.profile = res.data;
+			});
 			this.fetchRelationships();
 			if(localStorage.getItem('pf_metro_ui.exp.rm') == 'false') {
 				this.showReadMore = false;
@@ -607,7 +655,7 @@ export default {
 
 			timestampFormat() {
 					let ts = new Date(this.status.created_at);
-					return ts.toDateString();
+					return ts.toDateString() + ' · ' + ts.toLocaleTimeString();
 			},
 
 			fetchData() {
@@ -625,9 +673,9 @@ export default {
 								}
 								self.profileUrl = '/i/web/profile/_/' + response.data.status.account.id;
 								this.loaded = true;
-								setTimeout(function() {
-									self.fetchProfilePosts();
-								}, 3000);
+								// setTimeout(function() {
+								// 	self.fetchProfilePosts();
+								// }, 3000);
 								setTimeout(function() {
 									self.fetchState();
 									document.querySelectorAll('.status-comment .postCommentsContainer .comment-body a').forEach(function(i, e) {
@@ -656,9 +704,6 @@ export default {
 			likesModal() {
 				if($('body').hasClass('loggedIn') == false) {
 					window.location.href = '/login?next=' + encodeURIComponent('/p/' + this.status.shortcode);
-					return;
-				}
-				if(this.status.favourites_count == 0) {
 					return;
 				}
 				if(this.likes.length) {
@@ -1198,9 +1243,9 @@ export default {
 						status.sensitive == false
 					});
 					let ids = data.map(status => status.id);
-					if(data.length >= 3) {
-						self.showProfileMorePosts = true;
-					}
+					// if(data.length >= 3) {
+					// 	self.showProfileMorePosts = true;
+					// }
 					self.profileMorePosts = data.slice(0,6);
 				})
 			},
@@ -1402,6 +1447,75 @@ export default {
 					setTimeout(function() {
 						swal('Unfollow successful!', 'You are no longer following ' + username, 'success');
 					}, 500);
+				});
+			},
+
+			setCurrentLayout(layout) {
+				this.currentLayout = layout;
+			},
+
+			commentFocus(status, $event) {
+          if(status.comments_disabled) {
+              return;
+          }
+
+          this.replies = {};
+          this.replyStatus = {};
+          this.replyText = '';
+          this.replyId = status.id;
+          this.replyStatus = status;
+          // this.$refs.replyModal.show();
+          this.fetchStatusComments(status, '');
+
+          $('nav').hide();
+          $('footer').hide();
+          $('.mobile-footer-spacer').attr('style', 'display:none !important');
+          $('.mobile-footer').attr('style', 'display:none !important');
+          $('.mt-md-4').hide();
+          this.currentLayout = 'comments';
+          window.history.pushState({}, '', this.getStatusUrl(status));
+          return;
+      },
+
+      fetchStatusComments(status, card) {
+				let url = '/api/v2/comments/'+status.account.id+'/status/'+status.id;
+				axios.get(url)
+				.then(response => {
+					let self = this;
+					this.replies = _.reverse(response.data.data);
+					this.pagination = response.data.meta.pagination;
+					if(this.replies.length > 0) {
+						$('.load-more-link').removeClass('d-none');
+					}
+					$('.postCommentsLoader').addClass('d-none');
+					$('.postCommentsContainer').removeClass('d-none');
+					// setTimeout(function() {
+					// 	document.querySelectorAll('.status-comment .postCommentsContainer .comment-body a').forEach(function(i, e) {
+					// 		i.href = App.util.format.rewriteLinks(i);
+					// 	});
+					// }, 500);
+				}).catch(error => {
+					if(!error.response) {
+						$('.postCommentsLoader .lds-ring')
+						.attr('style','width:100%')
+						.addClass('pt-4 font-weight-bold text-muted')
+						.text('An error occurred, cannot fetch comments. Please try again later.');
+					} else {
+						switch(error.response.status) {
+							case 401:
+							$('.postCommentsLoader .lds-ring')
+							.attr('style','width:100%')
+							.addClass('pt-4 font-weight-bold text-muted')
+							.text('Please login to view.');
+							break;
+							default:
+							$('.postCommentsLoader .lds-ring')
+							.attr('style','width:100%')
+							.addClass('pt-4 font-weight-bold text-muted')
+							.text('An error occurred, cannot fetch comments. Please try again later.');
+							break;
+						}
+					}
 				});
 			},
 

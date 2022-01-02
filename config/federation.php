@@ -32,6 +32,10 @@ return [
 		'enabled' => env('ATOM_FEEDS', true),
 	],
 
+	'avatars' => [
+		'store_local' => false
+	],
+
 	'nodeinfo' => [
 		'enabled' => env('NODEINFO', true),
 	],
@@ -40,6 +44,6 @@ return [
 		'enabled' => env('WEBFINGER', true)
 	],
 
-	'network_timeline' => env('PF_NETWORK_TIMELINE', false)
+	'network_timeline' => env('PF_NETWORK_TIMELINE', true)
 
 ];

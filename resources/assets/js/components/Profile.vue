@@ -43,10 +43,10 @@
 									<div class="row">
 										<div class="col-4">
 											<div v-if="hasStory" class="has-story cursor-pointer shadow-sm" @click="storyRedirect()">
-												<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle" :src="profile.avatar" width="77px" height="77px">
+												<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle" :src="profile.avatar" width="77px" height="77px" onerror="this.onerror=null;this.src='/storage/avatars/default.png?v=0';">
 											</div>
 											<div v-else>
-												<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle border" :src="profile.avatar" width="77px" height="77px">
+												<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle border" :src="profile.avatar" width="77px" height="77px" onerror="this.onerror=null;this.src='/storage/avatars/default.png?v=0';">
 											</div>
 										</div>
 										<div class="col-8">
@@ -85,10 +85,10 @@
 								<!-- DESKTOP PROFILE PICTURE -->
 								<div class="d-none d-md-block pb-3">
 									<div v-if="hasStory" class="has-story-lg cursor-pointer shadow-sm" @click="storyRedirect()">
-										<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle box-shadow cursor-pointer" :src="profile.avatar" width="150px" height="150px">
+										<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle box-shadow cursor-pointer" :src="profile.avatar" width="150px" height="150px" onerror="this.onerror=null;this.src='/storage/avatars/default.png?v=0';">
 									</div>
 									<div v-else>
-										<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle box-shadow" :src="profile.avatar" width="150px" height="150px">
+										<img :alt="profileUsername + '\'s profile picture'" class="rounded-circle box-shadow" :src="profile.avatar" width="150px" height="150px" onerror="this.onerror=null;this.src='/storage/avatars/default.png?v=0';">
 									</div>
 									<p v-if="sponsorList.patreon || sponsorList.liberapay || sponsorList.opencollective" class="text-center mt-3">
 										<button type="button" @click="showSponsorModal" class="btn btn-outline-secondary font-weight-bold py-0">
@@ -145,7 +145,7 @@
 										<span v-if="profile.pronouns" class="text-muted small">{{profile.pronouns.join('/')}}</span>
 									</p>
 									<p v-if="profile.note" class="mb-0" v-html="profile.note"></p>
-									<p v-if="profile.website"><a :href="profile.website" class="profile-website small" rel="me external nofollow noopener" target="_blank" @click.prevent="remoteRedirect(profile.website)">{{formatWebsite(profile.website)}}</a></p>
+									<p v-if="profile.website"><a :href="profile.website" class="profile-website small" rel="me external nofollow noopener" target="_blank">{{formatWebsite(profile.website)}}</a></p>
 									<p class="d-flex small text-muted align-items-center">
 										<span v-if="profile.is_admin" class="btn btn-outline-danger btn-sm py-0 mr-3" title="Admin Account" data-toggle="tooltip">
 											Admin
@@ -181,64 +181,68 @@
 					<li v-if="owner" class="nav-item border-top">
 						<a :class="this.mode == 'bookmarks' ? 'nav-link text-dark' : 'nav-link'" href="#" v-on:click.prevent="switchMode('bookmarks')"><i class="fas fa-bookmark"></i> <span class="d-none d-md-inline-block small pl-1">SAVED</span></a>
 					</li>
+					<li v-if="owner" class="nav-item border-top">
+						<a :class="this.mode == 'archives' ? 'nav-link text-dark' : 'nav-link'" href="#" v-on:click.prevent="switchMode('archives')"><i class="far fa-folder-open"></i> <span class="d-none d-md-inline-block small pl-1">ARCHIVES</span></a>
+					</li>
 				</ul>
 			</div>
 
 			<div class="container px-0">
 				<div class="profile-timeline mt-md-4">
-					<div class="row" v-if="mode == 'grid'">
-						<div class="col-4 p-1 p-md-3" v-for="(s, index) in timeline" :key="'tlob:'+index">
-							<a class="card info-overlay card-md-border-0" :href="statusUrl(s)" v-once>
-								<div class="square">
-									<div v-if="s.sensitive" class="square-content">
-										<div class="info-overlay-text-label">
+					<div v-if="mode == 'grid'">
+						<div class="row">
+							<div class="col-4 p-1 p-md-3" v-for="(s, index) in timeline" :key="'tlob:'+index">
+								<a class="card info-overlay card-md-border-0" :href="statusUrl(s)" v-once>
+									<div class="square">
+										<div v-if="s.sensitive" class="square-content">
+											<div class="info-overlay-text-label">
+												<h5 class="text-white m-auto font-weight-bold">
+													<span>
+														<span class="far fa-eye-slash fa-lg p-2 d-flex-inline"></span>
+													</span>
+												</h5>
+											</div>
+											<blur-hash-canvas
+												width="32"
+												height="32"
+												:hash="s.media_attachments[0].blurhash"
+												/>
+										</div>
+										<div v-else class="square-content">
+											<blur-hash-image
+												width="32"
+												height="32"
+												:hash="s.media_attachments[0].blurhash"
+												:src="s.media_attachments[0].preview_url"
+												/>
+										</div>
+										<span v-if="s.pf_type == 'photo:album'" class="float-right mr-3 post-icon"><i class="fas fa-images fa-2x"></i></span>
+										<span v-if="s.pf_type == 'video'" class="float-right mr-3 post-icon"><i class="fas fa-video fa-2x"></i></span>
+										<span v-if="s.pf_type == 'video:album'" class="float-right mr-3 post-icon"><i class="fas fa-film fa-2x"></i></span>
+										<div class="info-overlay-text">
 											<h5 class="text-white m-auto font-weight-bold">
 												<span>
-													<span class="far fa-eye-slash fa-lg p-2 d-flex-inline"></span>
+													<span class="far fa-comment fa-lg p-2 d-flex-inline"></span>
+													<span class="d-flex-inline">{{formatCount(s.reply_count)}}</span>
 												</span>
 											</h5>
 										</div>
-										<blur-hash-canvas
-											width="32"
-											height="32"
-											:hash="s.media_attachments[0].blurhash"
-											/>
 									</div>
-									<div v-else class="square-content">
-
-										<blur-hash-image
-											width="32"
-											height="32"
-											:hash="s.media_attachments[0].blurhash"
-											:src="s.media_attachments[0].preview_url"
-											/>
-									</div>
-									<span v-if="s.pf_type == 'photo:album'" class="float-right mr-3 post-icon"><i class="fas fa-images fa-2x"></i></span>
-									<span v-if="s.pf_type == 'video'" class="float-right mr-3 post-icon"><i class="fas fa-video fa-2x"></i></span>
-									<span v-if="s.pf_type == 'video:album'" class="float-right mr-3 post-icon"><i class="fas fa-film fa-2x"></i></span>
-									<div class="info-overlay-text">
-										<h5 class="text-white m-auto font-weight-bold">
-											<span>
-												<span class="far fa-comment fa-lg p-2 d-flex-inline"></span>
-												<span class="d-flex-inline">{{formatCount(s.reply_count)}}</span>
-											</span>
-										</h5>
-									</div>
+								</a>
+							</div>
+							<div v-if="timeline.length == 0" class="col-12">
+								<div class="py-5 text-center text-muted">
+									<p><i class="fas fa-camera-retro fa-2x"></i></p>
+									<p class="h2 font-weight-light pt-3">No posts yet</p>
 								</div>
-							</a>
-						</div>
-						<div v-if="timeline.length == 0" class="col-12">
-							<div class="py-5 text-center text-muted">
-								<p><i class="fas fa-camera-retro fa-2x"></i></p>
-								<p class="h2 font-weight-light pt-3">No posts yet</p>
 							</div>
 						</div>
-					</div>
-					<div v-if="timeline.length && mode == 'grid'">
-						<infinite-loading @infinite="infiniteTimeline">
-							<div slot="no-more"></div>
-							<div slot="no-results"></div>
-						</infinite-loading>
+						<div v-if="timeline.length">
+							<infinite-loading @infinite="infiniteTimeline">
+								<div slot="no-more"></div>
+								<div slot="no-results"></div>
+							</infinite-loading>
+						</div>
 					</div>
 					<div v-if="mode == 'bookmarks'">
 						<div v-if="bookmarksLoading">
@@ -280,8 +284,9 @@
 							</div>
 						</div>
 					</div>
+
 					<div v-if="mode == 'collections'">
-						<div v-if="collections.length" class="row">
+						<div v-if="collections.length && collectionsLoaded" class="row">
 							<div class="col-4 p-1 p-sm-2 p-md-3" v-for="(c, index) in collections">
 								<a class="card info-overlay card-md-border-0" :href="c.url">
 									<div class="square">
@@ -296,6 +301,28 @@
 								<p><i class="fas fa-images fa-2x"></i></p>
 								<p class="h2 font-weight-light pt-3">No collections yet</p>
 							</div>
+						</div>
+					</div>
+
+					<div v-if="mode == 'archives'">
+						<div v-if="archives.length" class="col-12 col-md-8 offset-md-2 px-0 mb-sm-3 timeline mt-5">
+							<div class="alert alert-info">
+								<p class="mb-0">Posts you archive can only be seen by you.</p>
+								<p class="mb-0">For more information see the <a href="/site/kb/sharing-media">Sharing Media</a> help center page.</p>
+							</div>
+
+							<div v-for="(status, index) in archives">
+								<status-card
+									:class="{ 'border-top': index === 0 }"
+									:status="status"
+									:reaction-bar="false"
+								/>
+							</div>
+
+							<infinite-loading @infinite="archivesInfiniteLoader">
+								<div slot="no-more"></div>
+								<div slot="no-results"></div>
+							</infinite-loading>
 						</div>
 					</div>
 				</div>
@@ -404,53 +431,54 @@
 		title="Following"
 		body-class="list-group-flush py-3 px-0"
 		dialog-class="follow-modal">
-		<div v-if="!loading" class="list-group" style="min-height: 60vh;">
-			<div v-if="owner == true" class="list-group-item border-0 pt-0 px-0 mt-n2 mb-3">
-				<span class="d-flex px-4 pb-0 align-items-center">
-					<i class="fas fa-search text-lighter"></i>
-					<input type="text" class="form-control border-0 shadow-0 no-focus" placeholder="Search Following..." v-model="followingModalSearch" v-on:keyup="followingModalSearchHandler">
-				</span>
+		<div v-if="!followingLoading" class="list-group" style="max-height: 60vh;">
+			<div v-if="!following.length" class="list-group-item border-0">
+				<p class="text-center mb-0 font-weight-bold text-muted py-5">
+					<span class="text-dark">{{profileUsername}}</span> is not following yet</p>
 			</div>
-			<div v-if="owner == true" class="btn-group rounded-0 mt-n3 mb-3 border-top" role="group" aria-label="Following">
-					<!-- <button type="button" :class="[followingModalTab == 'following' ? ' btn btn-light py-3 rounded-0 font-weight-bold modal-tab-active' : 'btn btn-light py-3 rounded-0 font-weight-bold']" style="font-size: 12px;">FOLLOWING</button> -->
-					<!-- <button type="button" class="btn btn-light py-3 rounded-0 text-muted font-weight-bold" style="font-size: 12px;">MUTED</button>
-					<button type="button" class="btn btn-light py-3 rounded-0 text-muted font-weight-bold" style="font-size: 12px;">BLOCKED</button> -->
-			</div>
-			<div v-else class="btn-group rounded-0 mt-n3 mb-3" role="group" aria-label="Following">
-					<!-- <button type="button" class="btn btn-light py-3 rounded-0 border-primary border-left-0 border-right-0 border-top-0 font-weight-bold" style="font-size: 12px;" @click="followingModalTab = 'following'">FOLLOWING</button>
-					<button type="button" class="btn btn-light py-3 rounded-0 text-muted font-weight-bold" style="font-size: 12px;" @click="followingModalTab = 'mutual'">MUTUAL</button>
-					<button type="button" class="btn btn-light py-3 rounded-0 text-muted font-weight-bold" style="font-size: 12px;" @click="followingModalTab = 'blocked'">BLOCKED</button> -->
-			</div>
-			<div class="list-group-item border-0 py-1" v-for="(user, index) in following" :key="'following_'+index">
-				<div class="media">
-					<a :href="profileUrlRedirect(user)">
-						<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px" loading="lazy">
-					</a>
-					<div class="media-body text-truncate">
-						<p class="mb-0" style="font-size: 14px">
-							<a :href="profileUrlRedirect(user)" class="font-weight-bold text-dark">
-								{{user.username}}
-							</a>
-						</p>
-						<p v-if="!user.local" class="text-muted mb-0 text-truncate mr-3" style="font-size: 14px" :title="user.acct" data-toggle="dropdown" data-placement="bottom">
-							<span class="font-weight-bold">{{user.acct.split('@')[0]}}</span><span class="text-lighter">&commat;{{user.acct.split('@')[1]}}</span>
-						</p>
-						<p v-else class="text-muted mb-0 text-truncate" style="font-size: 14px">
-							{{user.display_name}}
-						</p>
-					</div>
-					<div v-if="owner">
-						<a class="btn btn-outline-dark btn-sm font-weight-bold" href="#" @click.prevent="followModalAction(user.id, index, 'following')">Following</a>
+			<div v-else>
+				<div v-if="owner == true" class="list-group-item border-0 pt-0 px-0 mt-n2 mb-3">
+					<span class="d-flex px-4 pb-0 align-items-center">
+						<i class="fas fa-search text-lighter"></i>
+						<input type="text" class="form-control border-0 shadow-0 no-focus" placeholder="Search Following..." v-model="followingModalSearch" v-on:keyup="followingModalSearchHandler">
+					</span>
+				</div>
+				<div class="list-group-item border-0 py-1 mb-1" v-for="(user, index) in following" :key="'following_'+index">
+					<div class="media">
+						<a :href="profileUrlRedirect(user)">
+							<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px" loading="lazy" onerror="this.onerror=null;this.src='/storage/avatars/default.png?v=0'">
+						</a>
+						<div class="media-body text-truncate">
+							<p class="mb-0" style="font-size: 14px">
+								<a :href="profileUrlRedirect(user)" class="font-weight-bold text-dark">
+									{{user.username}}
+								</a>
+							</p>
+							<p v-if="!user.local" class="text-muted mb-0 text-break mr-3" style="font-size: 14px" :title="user.acct" data-toggle="dropdown" data-placement="bottom">
+								<span class="font-weight-bold">{{user.acct.split('@')[0]}}</span><span class="text-lighter">&commat;{{user.acct.split('@')[1]}}</span>
+							</p>
+							<p v-else class="text-muted mb-0 text-truncate" style="font-size: 14px">
+								{{user.display_name ? user.display_name : user.username}}
+							</p>
+						</div>
+						<div v-if="owner">
+							<a class="btn btn-outline-dark btn-sm font-weight-bold" href="#" @click.prevent="followModalAction(user.id, index, 'following')">Following</a>
+						</div>
 					</div>
 				</div>
-			</div>
-			<div v-if="followingModalSearch && following.length == 0" class="list-group-item border-0">
-				<div class="list-group-item border-0 pt-5">
-					<p class="p-3 text-center mb-0 lead">No Results Found</p>
+				<div v-if="followingModalSearch && following.length == 0" class="list-group-item border-0">
+					<div class="list-group-item border-0 pt-5">
+						<p class="p-3 text-center mb-0 lead">No Results Found</p>
+					</div>
+				</div>
+				<div v-if="following.length > 0 && followingMore" class="list-group-item text-center" v-on:click="followingLoadMore()">
+					<p class="mb-0 small text-muted font-weight-light cursor-pointer">Load more</p>
 				</div>
 			</div>
-			<div v-if="following.length > 0 && followingMore" class="list-group-item text-center" v-on:click="followingLoadMore()">
-				<p class="mb-0 small text-muted font-weight-light cursor-pointer">Load more</p>
+		</div>
+		<div v-else class="text-center py-5">
+			<div class="spinner-border" role="status">
+				<span class="sr-only">Loading...</span>
 			</div>
 		</div>
 	</b-modal>
@@ -463,31 +491,42 @@
 		body-class="list-group-flush py-3 px-0"
 		dialog-class="follow-modal"
 		>
-		<div class="list-group">
-			<div v-if="followers.length == 0" class="list-group-item border-0">
+		<div v-if="!followerLoading" class="list-group" style="max-height: 60vh;">
+			<div v-if="!followers.length" class="list-group-item border-0">
 				<p class="text-center mb-0 font-weight-bold text-muted py-5">
 					<span class="text-dark">{{profileUsername}}</span> has no followers yet</p>
 			</div>
-			<div class="list-group-item border-0 py-1" v-for="(user, index) in followers" :key="'follower_'+index">
-				<div class="media mb-0">
-					<a :href="profileUrlRedirect(user)">
-						<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px" height="30px" loading="lazy">
-					</a>
-					<div class="media-body mb-0">
-						<p class="mb-0" style="font-size: 14px">
-							<a :href="profileUrlRedirect(user)" class="font-weight-bold text-dark">
-								{{user.username}}
-							</a>
-						</p>
-						<p class="text-secondary mb-0" style="font-size: 13px">
-							{{user.display_name}}
-						</p>
+
+			<div v-else>
+				<div class="list-group-item border-0 py-1 mb-1" v-for="(user, index) in followers" :key="'follower_'+index">
+					<div class="media mb-0">
+						<a :href="profileUrlRedirect(user)">
+							<img class="mr-3 rounded-circle box-shadow" :src="user.avatar" :alt="user.username + '’s avatar'" width="30px" height="30px" loading="lazy" onerror="this.onerror=null;this.src='/storage/avatars/default.png?v=0'">
+						</a>
+						<div class="media-body mb-0">
+							<p class="mb-0" style="font-size: 14px">
+								<a :href="profileUrlRedirect(user)" class="font-weight-bold text-dark">
+									{{user.username}}
+								</a>
+							</p>
+							<p v-if="!user.local" class="text-muted mb-0 text-break mr-3" style="font-size: 14px" :title="user.acct" data-toggle="dropdown" data-placement="bottom">
+								<span class="font-weight-bold">{{user.acct.split('@')[0]}}</span><span class="text-lighter">&commat;{{user.acct.split('@')[1]}}</span>
+							</p>
+							<p v-else class="text-muted mb-0 text-truncate" style="font-size: 14px">
+								{{user.display_name ? user.display_name : user.username}}
+							</p>
+						</div>
+						<!-- <button class="btn btn-primary font-weight-bold btn-sm py-1">FOLLOW</button> -->
 					</div>
-					<!-- <button class="btn btn-primary font-weight-bold btn-sm py-1">FOLLOW</button> -->
+				</div>
+				<div v-if="followers.length && followerMore" class="list-group-item text-center" v-on:click="followersLoadMore()">
+					<p class="mb-0 small text-muted font-weight-light cursor-pointer">Load more</p>
 				</div>
 			</div>
-			<div v-if="followers.length && followerMore" class="list-group-item text-center" v-on:click="followersLoadMore()">
-				<p class="mb-0 small text-muted font-weight-light cursor-pointer">Load more</p>
+		</div>
+		<div v-else class="text-center py-5">
+			<div class="spinner-border" role="status">
+				<span class="sr-only">Loading...</span>
 			</div>
 		</div>
 	</b-modal>
@@ -558,20 +597,20 @@
 		</div>
 	</b-modal>
 	<b-modal ref="embedModal"
-	id="ctx-embed-modal"
-	hide-header
-	hide-footer
-	centered
-	rounded
-	size="md"
-	body-class="p-2 rounded">
-	<div>
-		<textarea class="form-control disabled text-monospace" rows="6" style="overflow-y:hidden;border: 1px solid #efefef; font-size: 12px; line-height: 18px; margin: 0 0 7px;resize:none;" v-model="ctxEmbedPayload" disabled=""></textarea>
-		<hr>
-		<button :class="copiedEmbed ? 'btn btn-primary btn-block btn-sm py-1 font-weight-bold disabed': 'btn btn-primary btn-block btn-sm py-1 font-weight-bold'" @click="ctxCopyEmbed" :disabled="copiedEmbed">{{copiedEmbed ? 'Embed Code Copied!' : 'Copy Embed Code'}}</button>
-		<p class="mb-0 px-2 small text-muted">By using this embed, you agree to our <a href="/site/terms">Terms of Use</a></p>
-	</div>
-</b-modal>
+		id="ctx-embed-modal"
+		hide-header
+		hide-footer
+		centered
+		rounded
+		size="md"
+		body-class="p-2 rounded">
+		<div>
+			<textarea class="form-control disabled text-monospace" rows="6" style="overflow-y:hidden;border: 1px solid #efefef; font-size: 12px; line-height: 18px; margin: 0 0 7px;resize:none;" v-model="ctxEmbedPayload" disabled=""></textarea>
+			<hr>
+			<button :class="copiedEmbed ? 'btn btn-primary btn-block btn-sm py-1 font-weight-bold disabed': 'btn btn-primary btn-block btn-sm py-1 font-weight-bold'" @click="ctxCopyEmbed" :disabled="copiedEmbed">{{copiedEmbed ? 'Embed Code Copied!' : 'Copy Embed Code'}}</button>
+			<p class="mb-0 px-2 small text-muted">By using this embed, you agree to our <a href="/site/terms">Terms of Use</a></p>
+		</div>
+	</b-modal>
 </div>
 </template>
 <style type="text/css" scoped>
@@ -651,7 +690,7 @@
 </style>
 <script type="text/javascript">
 	import VueMasonry from 'vue-masonry-css'
-
+	import StatusCard from './partials/StatusCard.vue';
 
 	export default {
 		props: [
@@ -660,6 +699,11 @@
 			'profile-settings',
 			'profile-username'
 		],
+
+		components: {
+			StatusCard,
+		},
+
 		data() {
 			return {
 				ids: [],
@@ -671,22 +715,25 @@
 				max_id: 0,
 				loading: true,
 				owner: false,
-				layout: this.profileLayout,
+				layout: 'metro',
 				mode: 'grid',
-				modes: ['grid', 'collections', 'bookmarks'],
+				modes: ['grid', 'collections', 'bookmarks', 'archives'],
 				modalStatus: false,
 				relationship: {},
 				followers: [],
 				followerCursor: 1,
 				followerMore: true,
+				followerLoading: true,
 				following: [],
 				followingCursor: 1,
 				followingMore: true,
+				followingLoading: true,
 				warning: false,
 				sponsorList: [],
 				bookmarks: [],
 				bookmarksPage: 2,
 				collections: [],
+				collectionsLoaded: false,
 				collectionsPage: 2,
 				isMobile: false,
 				ctxEmbedPayload: null,
@@ -696,13 +743,19 @@
 				followingModalSearchCache: null,
 				followingModalTab: 'following',
 				bookmarksLoading: true,
+				archives: [],
+				archivesPage: 2
 			}
 		},
 		beforeMount() {
-			this.fetchRelationships();
 			this.fetchProfile();
 			let u = new URLSearchParams(window.location.search);
 			let forceMetro = localStorage.getItem('pf_metro_ui.exp.forceMetro') == 'true';
+
+			if(u.has('ui') && u.get('ui') == 'moment' && this.layout != 'moment') {
+				this.layout = 'moment';
+			}
+
 			if(forceMetro == true || u.has('ui') && u.get('ui') == 'metro' && this.layout != 'metro') {
 				this.layout = 'metro';
 			}
@@ -713,6 +766,39 @@
 						return;
 					}
 					this.mode = u.get('t');
+				}
+			}
+
+			if(u.has('m') && this.modes.includes(u.get('m'))) {
+				this.mode = u.get('m');
+
+				if(this.mode == 'bookmarks') {
+					axios.get('/api/local/bookmarks')
+					.then(res => {
+						this.bookmarks = res.data;
+						this.bookmarksLoading = false;
+					}).catch(err => {
+						this.mode = 'grid';
+					});
+				}
+
+				if(this.mode == 'collections') {
+					axios.get('/api/local/profile/collections/' + this.profileId)
+					.then(res => {
+						this.collections = res.data
+						this.collectionsLoaded = true;
+					}).catch(err => {
+						this.mode = 'grid';
+					});
+				}
+
+				if(this.mode == 'archives') {
+					axios.get('/api/pixelfed/v2/statuses/archives')
+					.then(res => {
+						this.archives = res.data;
+					}).catch(err => {
+						this.mode = 'grid';
+					});
 				}
 			}
 
@@ -731,17 +817,8 @@
 					this.user = res.data;
 					window._sharedData.curUser = res.data;
 					window.App.util.navatar();
-					if(res.data.id == this.profileId || this.relationship.following == true) {
-						axios.get('/api/stories/v0/exists/' + this.profileId)
-						.then(res => {
-							this.hasStory = res.data == true;
-						})
-					}
+					this.fetchRelationships();
 				});
-			}
-			if(window.outerWidth < 576) {
-				$('nav.navbar').hide();
-				this.isMobile = true;
 			}
 		},
 
@@ -755,7 +832,6 @@
 					this.profile = res.data;
 				}).then(res => {
 					this.fetchPosts();
-
 				});
 			},
 
@@ -844,19 +920,15 @@
 			},
 
 			switchMode(mode) {
-				this.mode = _.indexOf(this.modes, mode) ? mode : 'grid';
-				if(this.mode == 'bookmarks' && this.bookmarks.length == 0) {
-					axios.get('/api/local/bookmarks')
-					.then(res => {
-						this.bookmarks = res.data;
-						this.bookmarksLoading = false;
-					});
-				}
-				if(this.mode == 'collections' && this.collections.length == 0) {
-					axios.get('/api/local/profile/collections/' + this.profileId)
-					.then(res => {
-						this.collections = res.data
-					});
+				if(mode == 'grid') {
+					this.mode = mode;
+				} else if(mode == 'bookmarks' && this.bookmarks.length) {
+					this.mode = 'bookmarks';
+				} else if(mode == 'collections' && this.collections.length) {
+					this.mode = 'collections';
+				} else {
+					window.location.href = '/' + this.profileUsername + '?m=' + mode;
+					return;
 				}
 			},
 
@@ -984,6 +1056,12 @@
 							this.warning = true;
 						}
 					}
+					if(this.user.id == this.profileId || this.relationship.following == true) {
+						axios.get('/api/web/stories/v1/exists/' + this.profileId)
+						.then(res => {
+							this.hasStory = (res.data == true);
+						})
+					}
 				});
 			},
 
@@ -1000,7 +1078,11 @@
 					this.$refs.visitorContextMenu.hide();
 					swal('Success', 'You have successfully muted ' + this.profile.acct, 'success');
 				}).catch(err => {
-					swal('Error', 'Something went wrong. Please try again later.', 'error');
+					if(err.response.status == 422) {
+						swal('Error', err.response.data.error, 'error');
+					} else {
+						swal('Error', 'Something went wrong. Please try again later.', 'error');
+					}
 				});
 			},
 
@@ -1035,7 +1117,11 @@
 					this.$refs.visitorContextMenu.hide();
 					swal('Success', 'You have successfully blocked ' + this.profile.acct, 'success');
 				}).catch(err => {
-					swal('Error', 'Something went wrong. Please try again later.', 'error');
+					if(err.response.status == 422) {
+						swal('Error', err.response.data.error, 'error');
+					} else {
+						swal('Error', 'Something went wrong. Please try again later.', 'error');
+					}
 				});
 			},
 
@@ -1120,6 +1206,7 @@
 						if(res.data.length < 10) {
 							this.followingMore = false;
 						}
+						this.followingLoading = false;
 					});
 					this.$refs.followingModal.show();
 					return;
@@ -1149,6 +1236,7 @@
 						if(res.data.length < 10) {
 							this.followerMore = false;
 						}
+						this.followerLoading = false;
 					})
 					this.$refs.followerModal.show();
 					return;
@@ -1299,7 +1387,7 @@
 			},
 
 			storyRedirect() {
-				window.location.href = '/stories/' + this.profileUsername;
+				window.location.href = '/stories/' + this.profileUsername + '?t=4';
 			},
 
 			followingModalSearchHandler() {
@@ -1346,6 +1434,23 @@
 			joinedAtFormat(created) {
 				let d = new Date(created);
 				return d.toDateString();
+			},
+
+			archivesInfiniteLoader($state) {
+				axios.get('/api/pixelfed/v2/statuses/archives', {
+					params: {
+						page: this.archivesPage
+					}
+				}).then(res => {
+					if(res.data.length) {
+						this.archives.push(...res.data);
+						this.archivesPage++;
+						$state.loaded();
+					} else {
+						$state.complete();
+					}
+
+				});
 			}
 		}
 	}

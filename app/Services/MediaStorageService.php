@@ -43,18 +43,24 @@ class MediaStorageService {
 
 		$h = $r->getHeaders();
 
-		if (isset($h['Content-Length'], $h['Content-Type']) == false ||
-			empty($h['Content-Length']) ||
-			empty($h['Content-Type']) ||
-			$h['Content-Length'] < 10 ||
-			$h['Content-Length'] > (config_cache('pixelfed.max_photo_size') * 1000)
-		) {
+		if (isset($h['Content-Length'], $h['Content-Type']) == false) {
+			return false;
+		}
+
+		if(empty($h['Content-Length']) || empty($h['Content-Type']) ) {
+			return false;
+		}
+
+		$len = is_array($h['Content-Length']) ? $h['Content-Length'][0] : $h['Content-Length'];
+		$mime = is_array($h['Content-Type']) ? $h['Content-Type'][0] : $h['Content-Type'];
+
+		if($len < 10 || $len > ((config_cache('pixelfed.max_photo_size') * 1000))) {
 			return false;
 		}
 
 		return [
-			'length' => $h['Content-Length'][0],
-			'mime' => $h['Content-Type'][0]
+			'length' => $len,
+			'mime' => $mime
 		];
 	}
 
@@ -70,7 +76,7 @@ class MediaStorageService {
 	protected function localToCloud($media)
 	{
 		$path = storage_path('app/'.$media->media_path);
-        $thumb = storage_path('app/'.$media->thumbnail_path);
+		$thumb = storage_path('app/'.$media->thumbnail_path);
 
 		$p = explode('/', $media->media_path);
 		$name = array_pop($p);

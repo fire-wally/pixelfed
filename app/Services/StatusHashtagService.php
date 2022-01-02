@@ -6,6 +6,7 @@ use Cache;
 use Illuminate\Support\Facades\Redis;
 use App\{Status, StatusHashtag};
 use App\Transformer\Api\StatusHashtagTransformer;
+use App\Transformer\Api\HashtagTransformer;
 use League\Fractal;
 use League\Fractal\Serializer\ArraySerializer;
 use League\Fractal\Pagination\IlluminatePaginatorAdapter;
@@ -20,6 +21,9 @@ class StatusHashtagService {
 			return [];
 		}
 
+		$pid = request()->user() ? request()->user()->profile_id : false;
+		$filtered = $pid ? UserFilterService::filters($pid) : [];
+
 		return StatusHashtag::whereHashtagId($id)
 			->whereStatusVisibility('public')
 			->whereHas('media')
@@ -30,7 +34,10 @@ class StatusHashtagService {
 			->map(function ($i, $k) use ($id) {
 				return self::getStatus($i, $id);
 			})
-			->all();
+			->filter(function ($i) use($filtered) {
+				return isset($i['status']) && !empty($i['status']) && !in_array($i['status']['account']['id'], $filtered);
+			})
+			->values();
 	}
 
 	public static function coldGet($id, $start = 0, $stop = 2000)
@@ -71,5 +78,22 @@ class StatusHashtagService {
 	public static function getStatus($statusId, $hashtagId)
 	{
 		return ['status' => StatusService::get($statusId)];
+	}
+
+	public static function statusTags($statusId)
+	{
+		$key = 'pf:services:sh:id:' . $statusId;
+
+		return Cache::remember($key, 604800, function() use($statusId) {
+			$status = Status::find($statusId);
+			if(!$status) {
+				return [];
+			}
+
+			$fractal = new Fractal\Manager();
+			$fractal->setSerializer(new ArraySerializer());
+			$resource = new Fractal\Resource\Collection($status->hashtags, new HashtagTransformer());
+			return $fractal->createData($resource)->toArray();
+		});
 	}
 }

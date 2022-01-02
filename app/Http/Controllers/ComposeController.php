@@ -15,8 +15,10 @@ use App\{
 	Profile,
 	Place,
 	Status,
-	UserFilter
+	UserFilter,
+	UserSetting
 };
+use App\Models\Poll;
 use App\Transformer\Api\{
 	MediaTransformer,
 	MediaDraftTransformer,
@@ -36,12 +38,13 @@ use App\Jobs\VideoPipeline\{
 	VideoPostProcess,
 	VideoThumbnail
 };
+use App\Services\AccountService;
 use App\Services\NotificationService;
 use App\Services\MediaPathService;
 use App\Services\MediaBlocklistService;
 use App\Services\MediaStorageService;
 use App\Services\MediaTagService;
-use App\Services\ServiceService;
+use App\Services\StatusService;
 use Illuminate\Support\Str;
 use App\Util\Lexer\Autolink;
 use App\Util\Lexer\Extractor;
@@ -114,6 +117,7 @@ class ComposeController extends Controller
 		$storagePath = MediaPathService::get($user, 2);
 		$path = $photo->store($storagePath);
 		$hash = \hash_file('sha256', $photo);
+		$mime = $photo->getMimeType();
 
 		abort_if(MediaBlocklistService::exists($hash) == true, 451);
 
@@ -124,7 +128,7 @@ class ComposeController extends Controller
 		$media->media_path = $path;
 		$media->original_sha256 = $hash;
 		$media->size = $photo->getSize();
-		$media->mime = $photo->getMimeType();
+		$media->mime = $mime;
 		$media->filter_class = $filterClass;
 		$media->filter_name = $filterName;
 		$media->version = 3;
@@ -403,7 +407,7 @@ class ComposeController extends Controller
 			'media.*.id' => 'required|integer|min:1',
 			'media.*.filter_class' => 'nullable|alpha_dash|max:30',
 			'media.*.license' => 'nullable|string|max:140',
-			'media.*.alt' => 'nullable|string|max:140',
+			'media.*.alt' => 'nullable|string|max:'.config_cache('pixelfed.max_altext_length'),
 			'cw' => 'nullable|boolean',
 			'visibility' => 'required|string|in:public,private,unlisted|min:2|max:10',
 			'place' => 'nullable',
@@ -660,5 +664,72 @@ class ComposeController extends Controller
 		return [
 			'finished' => $finished
 		];
+	}
+
+	public function composeSettings(Request $request)
+	{
+		$uid = $request->user()->id;
+		$default = [
+			'default_license' => 1,
+			'media_descriptions' => false,
+			'max_altext_length' => config_cache('pixelfed.max_altext_length')
+		];
+		$settings = AccountService::settings($uid);
+		if(isset($settings['other']) && isset($settings['other']['scope'])) {
+			$s = $settings['compose_settings'];
+			$s['default_scope'] = $settings['other']['scope'];
+			$settings['compose_settings'] = $s;
+		}
+
+		return array_merge($default, $settings['compose_settings']);
+	}
+
+	public function createPoll(Request $request)
+	{
+		$this->validate($request, [
+			'caption' => 'nullable|string|max:'.config('pixelfed.max_caption_length', 500),
+			'cw' => 'nullable|boolean',
+			'visibility' => 'required|string|in:public,private',
+			'comments_disabled' => 'nullable',
+			'expiry' => 'required|in:60,360,1440,10080',
+			'pollOptions' => 'required|array|min:1|max:4'
+		]);
+
+		abort_if(config('instance.polls.enabled') == false, 404, 'Polls not enabled');
+
+		abort_if(Status::whereType('poll')
+			->whereProfileId($request->user()->profile_id)
+			->whereCaption($request->input('caption'))
+			->where('created_at', '>', now()->subDays(2))
+			->exists()
+		, 422, 'Duplicate detected.');
+
+		$status = new Status;
+		$status->profile_id = $request->user()->profile_id;
+		$status->caption = $request->input('caption');
+		$status->rendered = Autolink::create()->autolink($status->caption);
+		$status->visibility = 'draft';
+		$status->scope = 'draft';
+		$status->type = 'poll';
+		$status->local = true;
+		$status->save();
+
+		$poll = new Poll;
+		$poll->status_id = $status->id;
+		$poll->profile_id = $status->profile_id;
+		$poll->poll_options = $request->input('pollOptions');
+		$poll->expires_at = now()->addMinutes($request->input('expiry'));
+		$poll->cached_tallies = collect($poll->poll_options)->map(function($o) {
+			return 0;
+		})->toArray();
+		$poll->save();
+
+		$status->visibility = $request->input('visibility');
+		$status->scope = $request->input('visibility');
+		$status->save();
+
+		NewStatusPipeline::dispatch($status);
+
+		return ['url' => $status->url()];
 	}
 }
