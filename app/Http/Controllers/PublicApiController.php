@@ -15,7 +15,7 @@ use App\{
     StatusView,
     UserFilter
 };
-use Auth, Cache;
+use Auth, Cache, DB;
 use Illuminate\Support\Facades\Redis;
 use Carbon\Carbon;
 use League\Fractal;
@@ -27,10 +27,12 @@ use App\Transformer\Api\{
 };
 use App\Services\{
     AccountService,
+    BookmarkService,
     FollowerService,
     LikeService,
     PublicTimelineService,
     ProfileService,
+    ReblogService,
     RelationshipService,
     StatusService,
     SnowflakeService,
@@ -87,6 +89,26 @@ class PublicApiController extends Controller
             $collection = new Fractal\Resource\Collection($shares, new AccountTransformer());
             return $this->fractal->createData($collection)->toArray();
         }
+    }
+
+    public function getStatus(Request $request, $id)
+    {
+		abort_if(!$request->user(), 403);
+		$status = StatusService::get($id, false);
+		abort_if(!$status, 404);
+		if(in_array($status['visibility'], ['public', 'unlisted'])) {
+			return $status;
+		}
+		$pid = $request->user()->profile_id;
+		if($status['account']['id'] == $pid) {
+			return $status;
+		}
+		if($status['visibility'] == 'private') {
+			if(FollowerService::follows($pid, $status['account']['id'])) {
+				return $status;
+			}
+		}
+		abort(404);
     }
 
     public function status(Request $request, $username, int $postid)
@@ -303,11 +325,16 @@ class PublicApiController extends Controller
                           ->get()
                           ->map(function($s) use ($user) {
                                $status = StatusService::getFull($s->id, $user->profile_id);
+                               if(!$status) {
+                               		return false;
+                               }
                                $status['favourited'] = (bool) LikeService::liked($user->profile_id, $s->id);
+                               $status['bookmarked'] = (bool) BookmarkService::get($user->profile_id, $s->id);
+                               $status['reblogged'] = (bool) ReblogService::get($user->profile_id, $s->id);
                                return $status;
                           })
                           ->filter(function($s) use($filtered) {
-                                return $s && in_array($s['account']['id'], $filtered) == false;
+                                return $s && isset($s['account']) && in_array($s['account']['id'], $filtered) == false;
                           })
                           ->values();
                 $res = $timeline->toArray();
@@ -342,7 +369,12 @@ class PublicApiController extends Controller
                           ->get()
                           ->map(function($s) use ($user) {
                                $status = StatusService::getFull($s->id, $user->profile_id);
+                               if(!$status) {
+                               		return false;
+                               }
                                $status['favourited'] = (bool) LikeService::liked($user->profile_id, $s->id);
+                               $status['bookmarked'] = (bool) BookmarkService::get($user->profile_id, $s->id);
+                               $status['reblogged'] = (bool) ReblogService::get($user->profile_id, $s->id);
                                return $status;
                           })
                           ->filter(function($s) use($filtered) {
@@ -372,12 +404,14 @@ class PublicApiController extends Controller
                 $status = StatusService::get($k);
                 if($user) {
                     $status['favourited'] = (bool) LikeService::liked($user->profile_id, $k);
+                    $status['bookmarked'] = (bool) BookmarkService::get($user->profile_id, $k);
+                    $status['reblogged'] = (bool) ReblogService::get($user->profile_id, $k);
                     $status['relationship'] = RelationshipService::get($user->profile_id, $status['account']['id']);
                 }
                 return $status;
             })
             ->filter(function($s) use($filtered) {
-                return in_array($s['account']['id'], $filtered) == false;
+                return isset($s['account']) && in_array($s['account']['id'], $filtered) == false;
             })
             ->values()
             ->toArray();
@@ -455,7 +489,7 @@ class PublicApiController extends Controller
         if($min || $max) {
             $dir = $min ? '>' : '<';
             $id = $min ?? $max;
-            $timeline = Status::select(
+           	return Status::select(
                         'id',
                         'uri',
                         'caption',
@@ -482,13 +516,27 @@ class PublicApiController extends Controller
                       ->with('profile', 'hashtags', 'mentions')
                       ->where('id', $dir, $id)
                       ->whereIn('profile_id', $following)
-                      ->whereNotIn('profile_id', $filtered)
                       ->whereIn('visibility',['public', 'unlisted', 'private'])
                       ->orderBy('created_at', 'desc')
                       ->limit($limit)
-                      ->get();
+                      ->get()
+                      ->map(function($s) use ($user) {
+                           $status = StatusService::get($s->id);
+                           if(!$status) {
+                           		return false;
+                           }
+                           $status['favourited'] = (bool) LikeService::liked($user->profile_id, $s->id);
+                           $status['bookmarked'] = (bool) BookmarkService::get($user->profile_id, $s->id);
+                           $status['reblogged'] = (bool) ReblogService::get($user->profile_id, $s->id);
+                           return $status;
+                      })
+                      ->filter(function($s) use($filtered) {
+                            return $s && in_array($s['account']['id'], $filtered) == false;
+                      })
+                      ->values()
+                      ->toArray();
         } else {
-            $timeline = Status::select(
+            return Status::select(
                         'id',
                         'uri',
                         'caption',
@@ -514,15 +562,26 @@ class PublicApiController extends Controller
                       })
                       ->with('profile', 'hashtags', 'mentions')
                       ->whereIn('profile_id', $following)
-                      ->whereNotIn('profile_id', $filtered)
                       ->whereIn('visibility',['public', 'unlisted', 'private'])
                       ->orderBy('created_at', 'desc')
-                      ->simplePaginate($limit);
+                      ->limit($limit)
+                      ->get()
+                      ->map(function($s) use ($user) {
+                           $status = StatusService::get($s->id);
+                           if(!$status) {
+                           		return false;
+                           }
+                           $status['favourited'] = (bool) LikeService::liked($user->profile_id, $s->id);
+                           $status['bookmarked'] = (bool) BookmarkService::get($user->profile_id, $s->id);
+                           $status['reblogged'] = (bool) ReblogService::get($user->profile_id, $s->id);
+                           return $status;
+                      })
+                      ->filter(function($s) use($filtered) {
+                            return $s && in_array($s['account']['id'], $filtered) == false;
+                      })
+                      ->values()
+                      ->toArray();
         }
-
-        $fractal = new Fractal\Resource\Collection($timeline, new StatusTransformer());
-        $res = $this->fractal->createData($fractal)->toArray();
-        return response()->json($res);
     }
 
     public function networkTimelineApi(Request $request)
@@ -569,6 +628,8 @@ class PublicApiController extends Controller
                      ->map(function($s) use ($user) {
                             $status = StatusService::get($s->id);
                             $status['favourited'] = (bool) LikeService::liked($user->profile_id, $s->id);
+                            $status['bookmarked'] = (bool) BookmarkService::get($user->profile_id, $s->id);
+                            $status['reblogged'] = (bool) ReblogService::get($user->profile_id, $s->id);
                             return $status;
                       });
             $res = $timeline->toArray();
@@ -592,6 +653,8 @@ class PublicApiController extends Controller
                           ->map(function($s) use ($user) {
                                 $status = StatusService::get($s->id);
                                 $status['favourited'] = (bool) LikeService::liked($user->profile_id, $s->id);
+                                $status['bookmarked'] = (bool) BookmarkService::get($user->profile_id, $s->id);
+                                $status['reblogged'] = (bool) ReblogService::get($user->profile_id, $s->id);
                                 return $status;
                           });
                 $res = $timeline->toArray();
@@ -631,70 +694,82 @@ class PublicApiController extends Controller
 
     public function accountFollowers(Request $request, $id)
     {
-        abort_unless(Auth::check(), 403);
-        $profile = Profile::with('user')->whereNull('status')->findOrFail($id);
-        $owner = Auth::id() == $profile->user_id;
+		abort_if(!$request->user(), 403);
+		$account = AccountService::get($id);
+		abort_if(!$account, 404);
+		$pid = $request->user()->profile_id;
 
-        if(Auth::id() != $profile->user_id && $profile->is_private) {
-            return response()->json([]);
-        }
-        if(!$profile->domain && !$profile->user->settings->show_profile_followers) {
-            return response()->json([]);
-        }
-        if(!$owner && $request->page > 5) {
-            return [];
-        }
+		if($pid != $account['id']) {
+			if($account['locked']) {
+				if(FollowerService::follows($pid, $account['id'])) {
+					return [];
+				}
+			}
 
-        $res = Follower::select('id', 'profile_id', 'following_id')
-            ->whereFollowingId($profile->id)
-            ->orderByDesc('id')
-            ->simplePaginate(10)
-            ->map(function($follower) {
-                return ProfileService::get($follower['profile_id']);
-            })
-            ->toArray();
+			if(AccountService::hiddenFollowers($id)) {
+				return [];
+			}
 
-        return response()->json($res);
+			if($request->has('page') && $request->page >= 5) {
+				return [];
+			}
+		}
+
+		$res = DB::table('followers')
+			->select('id', 'profile_id', 'following_id')
+			->whereFollowingId($account['id'])
+			->orderByDesc('id')
+			->simplePaginate(10)
+			->map(function($follower) {
+				return AccountService::get($follower->profile_id);
+			})
+			->filter(function($account) {
+				return $account && isset($account['id']);
+			})
+			->values()
+			->toArray();
+
+		return response()->json($res);
     }
 
     public function accountFollowing(Request $request, $id)
     {
-        abort_unless(Auth::check(), 403);
+		abort_if(!$request->user(), 403);
+		$account = AccountService::get($id);
+		abort_if(!$account, 404);
+		$pid = $request->user()->profile_id;
 
-        $profile = Profile::with('user')
-            ->whereNull('status')
-            ->findOrFail($id);
+		if($pid != $account['id']) {
+			if($account['locked']) {
+				if(FollowerService::follows($pid, $account['id'])) {
+					return [];
+				}
+			}
 
-        // filter by username
-        $search = $request->input('fbu');
-        $owner = Auth::id() == $profile->user_id;
-        $filter = ($owner == true) && ($search != null);
+			if(AccountService::hiddenFollowing($id)) {
+				return [];
+			}
 
-        abort_if($owner == false && $profile->is_private == true && !$profile->followedBy(Auth::user()->profile), 404);
+			if($request->has('page') && $request->page >= 5) {
+				return [];
+			}
+		}
 
-        if(!$profile->domain) {
-            abort_if($profile->user->settings->show_profile_following == false && $owner == false, 404);
-        }
+		$res = DB::table('followers')
+			->select('id', 'profile_id', 'following_id')
+			->whereProfileId($account['id'])
+			->orderByDesc('id')
+			->simplePaginate(10)
+			->map(function($follower) {
+				return AccountService::get($follower->following_id);
+			})
+			->filter(function($account) {
+				return $account && isset($account['id']);
+			})
+			->values()
+			->toArray();
 
-        if(!$owner && $request->page > 5) {
-            return [];
-        }
-
-        if($search) {
-            abort_if(!$owner, 404);
-            $following = $profile->following()
-                    ->where('profiles.username', 'like', '%'.$search.'%')
-                    ->orderByDesc('followers.created_at')
-                    ->paginate(10);
-        } else {
-            $following = $profile->following()
-                ->orderByDesc('followers.created_at')
-                ->paginate(10);
-        }
-        $resource = new Fractal\Resource\Collection($following, new AccountTransformer());
-        $res = $this->fractal->createData($resource)->toArray();
-
-        return response()->json($res);
+		return response()->json($res);
     }
 
     public function accountStatuses(Request $request, $id)
@@ -717,6 +792,11 @@ class PublicApiController extends Controller
         $max_id = $request->max_id;
         $min_id = $request->min_id;
         $scope = ['photo', 'photo:album', 'video', 'video:album'];
+        $onlyMedia = $request->input('only_media', true);
+
+        if(!$min_id && !$max_id) {
+        	$min_id = 1;
+        }
 
         if($profile['locked']) {
             if(!$user) {
@@ -740,7 +820,6 @@ class PublicApiController extends Controller
                 $visibility = ['public', 'unlisted'];
             }
         }
-
         $dir = $min_id ? '>' : '<';
         $id = $min_id ?? $max_id;
         $res = Status::whereProfileId($profile['id'])
@@ -763,7 +842,16 @@ class PublicApiController extends Controller
             }
             return $status;
         })
-        ->filter(function($s) {
+        ->filter(function($s) use($onlyMedia) {
+        	if($onlyMedia) {
+        		if(
+        			!isset($s['media_attachments']) ||
+        			!is_array($s['media_attachments']) ||
+        			empty($s['media_attachments'])
+        		) {
+        			return false;
+        		}
+        	}
             return $s;
         })
         ->values();

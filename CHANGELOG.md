@@ -1,6 +1,45 @@
 # Release Notes
 
-## [Unreleased](https://github.com/pixelfed/pixelfed/compare/v0.11.1...dev)
+## [Unreleased](https://github.com/pixelfed/pixelfed/compare/v0.11.2...dev)
+
+### Added
+- Custom Emoji ([#3166](https://github.com/pixelfed/pixelfed/pull/3166))
+
+### Metro 2.0 UI
+- Added Hovercards ([16ced7b4](https://github.com/pixelfed/pixelfed/commit/16ced7b4))
+- Fix word-break on statuses ([16ced7b4](https://github.com/pixelfed/pixelfed/commit/16ced7b4))
+- Add pronouns to hovercards ([33f863e8](https://github.com/pixelfed/pixelfed/commit/33f863e8))
+- Improved onboarding ([042c5b6c](https://github.com/pixelfed/pixelfed/commit/042c5b6c))
+- Add Hide Counts & Stats setting ([01af7d80](https://github.com/pixelfed/pixelfed/commit/01af7d80))
+- Fix nsfw videos not displaying sensitive warning ([01af7d80](https://github.com/pixelfed/pixelfed/commit/01af7d80))
+- Easy Avatar updates - update from timelines with drag-n-drop support ([f37d3798](https://github.com/pixelfed/pixelfed/commit/f37d3798))
+- Comment hovercards ([f37d3798](https://github.com/pixelfed/pixelfed/commit/f37d3798))
+- Mod tools button on posts for admins ([f37d3798](https://github.com/pixelfed/pixelfed/commit/f37d3798))
+- Improved Media Previews - disable to restore original preview aspect ratios ([c55eeac8](https://github.com/pixelfed/pixelfed/commit/c55eeac8))
+- Moved media license to post header ([390f3ab0](https://github.com/pixelfed/pixelfed/commit/390f3ab0))
+
+### Updated
+- Updated MediaStorageService, fix remote avatar bug. ([1c20d696](https://github.com/pixelfed/pixelfed/commit/1c20d696))
+- Updated WebfingerService. Fixes #3167. ([aff74566](https://github.com/pixelfed/pixelfed/commit/aff74566))
+- Updated ComposeModal, add max file size and allowed mime types. Fixes #3162. ([879281cc](https://github.com/pixelfed/pixelfed/commit/879281cc))
+- Updated profile embeds, fix NaN bug and improve performance. ([3bd211d7](https://github.com/pixelfed/pixelfed/commit/3bd211d7))
+- Updated ApiV1Controller, improve follow count cache invalidation. ([4b6effb9](https://github.com/pixelfed/pixelfed/commit/4b6effb9))
+- Updated web routes, fix atom feeds for account usernames containing a dot. ([8c54ab57](https://github.com/pixelfed/pixelfed/commit/8c54ab57))
+- Updated atom feeds, include media alt text. Fixes #3184. ([5d9b6863](https://github.com/pixelfed/pixelfed/commit/5d9b6863))
+- Updated ApiV1Controller, add custom_emoji endpoint. ([16e72518](https://github.com/pixelfed/pixelfed/commit/16e72518))
+- Updated InternalApiController, redirect remote post and profiles to Metro 2.0. ([3c35158e](https://github.com/pixelfed/pixelfed/commit/3c35158e))
+- Updated BaseApiController, improve favourites endpoint. ([f063cb01](https://github.com/pixelfed/pixelfed/commit/f063cb01))
+- Updated ApiV1Controller, invalidate status reply cache on new reply. ([3c261bbf](https://github.com/pixelfed/pixelfed/commit/3c261bbf))
+- Updated PublicApiController, add bookmark state to timeline endpoints. ([c0b1e042](https://github.com/pixelfed/pixelfed/commit/c0b1e042))
+- Updated ApiV1Controller, fix private status replies returning 404. ([73226360](https://github.com/pixelfed/pixelfed/commit/73226360))
+- Updated StatusService, use BookmarkService for bookmarked state. ([a7d71551](https://github.com/pixelfed/pixelfed/commit/a7d71551))
+- Updated Apis, added ReblogService to improve reblogged state for api entities ([6cfd6be5](https://github.com/pixelfed/pixelfed/commit/6cfd6be5))
+- Updated InstanceActorController, fix content-type header. ([21792246](https://github.com/pixelfed/pixelfed/commit/21792246))
+- Updated Exception handler to report validation message bag errors. ([74905ba1](https://github.com/pixelfed/pixelfed/commit/74905ba1))
+- Updated ApiV1Controller, add validation messages to update_credentials endpoint. ([cd785601](https://github.com/pixelfed/pixelfed/commit/cd785601))
+-  ([](https://github.com/pixelfed/pixelfed/commit/))
+
+## [v0.11.2 (2022-01-09)](https://github.com/pixelfed/pixelfed/compare/v0.11.1...v0.11.2)
 
 ### Breaking
 - Dropped support for PHP 7.3 [#3041](https://github.com/pixelfed/pixelfed/pull/3041)
@@ -9,15 +48,22 @@
 - Added UI Settings modal and fixed height media previews setting ([f2467e71](https://github.com/pixelfed/pixelfed/commit/f2467e71))
 - Set max-width of 1440px for larger screens ([af68872a](https://github.com/pixelfed/pixelfed/commit/af68872a))
 - Add link to sidebar profile card ([85964510](https://github.com/pixelfed/pixelfed/commit/85964510))
+- Improved search bar, now resolves (and imports) remote accounts and posts, including webfinger addresses ([c8a667f2](https://github.com/pixelfed/pixelfed/commit/c8a667f2))
+- Added user facing changelog at `/i/web/whats-new` ([e61dc66a](https://github.com/pixelfed/pixelfed/commit/e61dc66a))
 
 ### Configuration
 - Enable network timeline by default ([b95aec12](https://github.com/pixelfed/pixelfed/commit/b95aec12))
+
+### Postgres Compatibility
+- Fix Story recent endpoint on postgres instances ([ddf41dc3](https://github.com/pixelfed/pixelfed/commit/ddf41dc3))
+- Fix Direct Message conversations endpoint on postgres instances ([fcabc9be](https://github.com/pixelfed/pixelfed/commit/fcabc9be))
 
 ### Added
 - Manual email verification requests. ([bc659387](https://github.com/pixelfed/pixelfed/commit/bc659387))
 - Added StatusMentionService, fixes #3026. ([e5387d67](https://github.com/pixelfed/pixelfed/commit/e5387d67))
 - Cloud Backups, a command to store backups on S3 or compatible filesystems. [#3037](https://github.com/pixelfed/pixelfed/pull/3037) ([3515a98e](https://github.com/pixelfed/pixelfed/commit/3515a98e))
 - Web UI Localizations + Crowdin integration. ([f7d9b40b](https://github.com/pixelfed/pixelfed/commit/f7d9b40b)) ([7ff120c9](https://github.com/pixelfed/pixelfed/commit/7ff120c9))
+- Store remote avatars locally if S3 not enabled. ([b4bd0400](https://github.com/pixelfed/pixelfed/commit/b4bd0400))
 
 ### Updated
 - Updated NotificationService, fix 500 bug. ([4a609dc3](https://github.com/pixelfed/pixelfed/commit/4a609dc3))
@@ -78,7 +124,19 @@
 - Updated RemoteAvatarFetch job, fixed bug preventing new avatars from being stored. ([92bc2845](https://github.com/pixelfed/pixelfed/commit/92bc2845))
 - Updated AccountService, fix json casting. ([e5f8f344](https://github.com/pixelfed/pixelfed/commit/e5f8f344))
 - Updated ApiV1Controller, fix illegal operator bug by setting default min_id. ([415826f2](https://github.com/pixelfed/pixelfed/commit/415826f2))
--  ([](https://github.com/pixelfed/pixelfed/commit/))
+- Updated StatusService, add getMastodon method for mastoapi compatibility. ([36a129fe](https://github.com/pixelfed/pixelfed/commit/36a129fe))
+- Updated PublicApiController, fix accountStatuses pagination operator. ([85fc9dd0](https://github.com/pixelfed/pixelfed/commit/85fc9dd0))
+- Updated PublicApiController, enforce only_media on accountStatuses method. Fixes #3105. ([861a2d36](https://github.com/pixelfed/pixelfed/commit/861a2d36))
+- Updated ApiV1Controller, add mastoapi strict mode. ([46485426](https://github.com/pixelfed/pixelfed/commit/46485426))
+- Updated AccountController, refresh RelationshipService on mute/block. ([6f1b0245](https://github.com/pixelfed/pixelfed/commit/6f1b0245))
+- Updated ApiV1Controller, fix version on instance endpoint. ([a6261221](https://github.com/pixelfed/pixelfed/commit/a6261221))
+- Updated components, fix api endpoints. Fixes #3138. ([e724633e](https://github.com/pixelfed/pixelfed/commit/e724633e))
+- Updated ApiV1Controller, fix public timeline endpoint. ([80c7def3](https://github.com/pixelfed/pixelfed/commit/80c7def3))
+- Updated PublicApiController, fix public timeline endpoint. ([dcb7ba9c](https://github.com/pixelfed/pixelfed/commit/dcb7ba9c))
+- Updated ApiV1Controller, fix home timeline entities. ([6fc0dcb3](https://github.com/pixelfed/pixelfed/commit/6fc0dcb3))
+- Updated ApiV1Controller, fix favourites endpoints ([d6d99385](https://github.com/pixelfed/pixelfed/commit/d6d99385))
+- Updated ApiV1Controller, fix reblogs endpoints ([de42d84c](https://github.com/pixelfed/pixelfed/commit/de42d84c))
+- Updated SearchApiV2Service, resolve remote queries. ([c8a667f2](https://github.com/pixelfed/pixelfed/commit/c8a667f2))
 
 ## [v0.11.1 (2021-09-07)](https://github.com/pixelfed/pixelfed/compare/v0.11.0...v0.11.1)
 ### Added

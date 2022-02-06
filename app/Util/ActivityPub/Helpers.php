@@ -23,10 +23,12 @@ use App\Jobs\RemoteFollowPipeline\RemoteFollowImportRecent;
 use App\Jobs\ImageOptimizePipeline\{ImageOptimize,ImageThumbnail};
 use App\Jobs\StatusPipeline\NewStatusPipeline;
 use App\Jobs\StatusPipeline\StatusReplyPipeline;
+use App\Jobs\StatusPipeline\StatusTagsPipeline;
 use App\Util\ActivityPub\HttpSignature;
 use Illuminate\Support\Str;
 use App\Services\ActivityPubFetchService;
 use App\Services\ActivityPubDeliveryService;
+use App\Services\CustomEmojiService;
 use App\Services\InstanceService;
 use App\Services\MediaPathService;
 use App\Services\MediaStorageService;
@@ -368,7 +370,6 @@ class Helpers {
 			$cw = true;
 		}
 
-
 		$statusLockKey = 'helpers:status-lock:' . hash('sha256', $res['id']);
 		$status = Cache::lock($statusLockKey)
 			->get(function () use(
@@ -381,6 +382,7 @@ class Helpers {
 				$scope,
 				$id
 		) {
+
 			if($res['type'] === 'Question') {
 				$status = self::storePoll(
 					$profile,
@@ -415,6 +417,10 @@ class Helpers {
 					self::importNoteAttachment($res, $status);
 				} else {
 					StatusReplyPipeline::dispatch($status);
+				}
+
+				if(isset($res['tag']) && is_array($res['tag']) && !empty($res['tag'])) {
+					StatusTagsPipeline::dispatch($res, $status);
 				}
 				return $status;
 			});
@@ -586,9 +592,7 @@ class Helpers {
 						$profile->webfinger = Purify::clean($webfinger);
 						$profile->last_fetched_at = now();
 						$profile->save();
-						if(config_cache('pixelfed.cloud_storage') == true) {
-							RemoteAvatarFetch::dispatch($profile);
-						}
+						RemoteAvatarFetch::dispatch($profile);
 						return $profile;
 					});
 				});
@@ -603,9 +607,7 @@ class Helpers {
 					$profile->sharedInbox = isset($res['endpoints']) && isset($res['endpoints']['sharedInbox']) && Helpers::validateUrl($res['endpoints']['sharedInbox']) ? $res['endpoints']['sharedInbox'] : null;
 					$profile->save();
 				}
-				if(config_cache('pixelfed.cloud_storage') == true) {
-					RemoteAvatarFetch::dispatch($profile);
-				}
+				RemoteAvatarFetch::dispatch($profile);
 			}
 			return $profile;
 		});

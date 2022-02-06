@@ -84,6 +84,12 @@ Route::domain(config('pixelfed.domain.admin'))->prefix('i/admin')->group(functio
 
 	Route::get('diagnostics/home', 'AdminController@diagnosticsHome')->name('admin.diagnostics');
 	Route::post('diagnostics/decrypt', 'AdminController@diagnosticsDecrypt')->name('admin.diagnostics.decrypt');
+	Route::get('custom-emoji/home', 'AdminController@customEmojiHome')->name('admin.custom-emoji');
+	Route::post('custom-emoji/toggle-active/{id}', 'AdminController@customEmojiToggleActive');
+	Route::get('custom-emoji/new', 'AdminController@customEmojiAdd');
+	Route::post('custom-emoji/new', 'AdminController@customEmojiStore');
+	Route::post('custom-emoji/delete/{id}', 'AdminController@customEmojiDelete');
+	Route::get('custom-emoji/duplicates/{id}', 'AdminController@customEmojiShowDuplicates');
 });
 
 Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofactor', 'localization'])->group(function () {
@@ -151,6 +157,8 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 			Route::get('loops', 'DiscoverController@loopsApi');
 			Route::post('loops/watch', 'DiscoverController@loopWatch');
 			Route::get('discover/tag', 'DiscoverController@getHashtags');
+			Route::get('statuses/{id}/replies', 'Api\ApiV1Controller@statusReplies');
+			Route::get('statuses/{id}/state', 'Api\ApiV1Controller@statusState');
 		});
 
 		Route::group(['prefix' => 'pixelfed'], function() {
@@ -163,6 +171,7 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 				Route::get('accounts/{id}/followers', 'PublicApiController@accountFollowers');
 				Route::post('accounts/{id}/block', 'Api\ApiV1Controller@accountBlockById');
 				Route::post('accounts/{id}/unblock', 'Api\ApiV1Controller@accountUnblockById');
+				Route::get('statuses/{id}', 'PublicApiController@getStatus');
 				Route::get('accounts/{id}', 'PublicApiController@account');
 				Route::post('avatar/update', 'ApiController@avatarUpdate');
 				Route::get('custom_emojis', 'Api\ApiV1Controller@customEmojis');
@@ -189,24 +198,24 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 				Route::get('comments/{username}/status/{postId}', 'PublicApiController@statusComments');
 				Route::get('likes/profile/{username}/status/{id}', 'PublicApiController@statusLikes');
 				Route::get('shares/profile/{username}/status/{id}', 'PublicApiController@statusShares');
-				Route::get('status/{id}/replies', 'InternalApiController@statusReplies');
 				Route::post('moderator/action', 'InternalApiController@modAction');
 				Route::get('discover/categories', 'InternalApiController@discoverCategories');
 				Route::get('loops', 'DiscoverController@loopsApi');
 				Route::post('loops/watch', 'DiscoverController@loopWatch');
 				Route::get('discover/tag', 'DiscoverController@getHashtags');
-				Route::post('status/compose', 'InternalApiController@composePost');
 				Route::get('discover/posts/trending', 'DiscoverController@trendingApi');
 				Route::get('discover/posts/hashtags', 'DiscoverController@trendingHashtags');
 				Route::get('discover/posts/places', 'DiscoverController@trendingPlaces');
 				Route::get('seasonal/yir', 'SeasonalController@getData');
 				Route::post('seasonal/yir', 'SeasonalController@store');
-				Route::post('status/{id}/archive', 'ApiController@archive');
-				Route::post('status/{id}/unarchive', 'ApiController@unarchive');
-				Route::get('statuses/archives', 'ApiController@archivedPosts');
 				Route::get('mutes', 'AccountController@accountMutesV2');
 				Route::get('blocks', 'AccountController@accountBlocksV2');
 				Route::get('filters', 'AccountController@accountFiltersV2');
+				Route::post('status/compose', 'InternalApiController@composePost');
+				Route::get('status/{id}/replies', 'InternalApiController@statusReplies');
+				Route::post('status/{id}/archive', 'ApiController@archive');
+				Route::post('status/{id}/unarchive', 'ApiController@unarchive');
+				Route::get('statuses/archives', 'ApiController@archivedPosts');
 			});
 
 			Route::get('discover/accounts/popular', 'Api\ApiV1Controller@discoverAccountsPopular');
@@ -507,7 +516,7 @@ Route::domain(config('pixelfed.domain.app'))->middleware(['validemail', 'twofact
 
 	Route::group(['prefix' => 'users'], function () {
 		Route::redirect('/', '/');
-		Route::get('{user}.atom', 'ProfileController@showAtomFeed');
+		Route::get('{user}.atom', 'ProfileController@showAtomFeed')->where('user', '.*');
 		Route::get('{username}/outbox', 'FederationController@userOutbox');
 		Route::get('{username}/followers', 'FederationController@userFollowers');
 		Route::get('{username}/following', 'FederationController@userFollowing');

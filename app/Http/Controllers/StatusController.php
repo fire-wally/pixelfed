@@ -25,6 +25,7 @@ use Illuminate\Support\Str;
 use App\Services\HashidService;
 use App\Services\StatusService;
 use App\Util\Media\License;
+use App\Services\ReblogService;
 
 class StatusController extends Controller
 {
@@ -231,7 +232,7 @@ class StatusController extends Controller
 
 		$user = Auth::user();
 		$profile = $user->profile;
-		$status = Status::whereIn('scope', ['public', 'unlisted'])
+		$status = Status::whereScope('public')
 			->findOrFail($request->input('item'));
 
 		$count = $status->reblogs_count;
@@ -245,6 +246,7 @@ class StatusController extends Controller
 				  ->get();
 			foreach ($shares as $share) {
 				UndoSharePipeline::dispatch($share);
+				ReblogService::del($profile->id, $status->id);
 				$count--;
 			}
 		} else {
@@ -255,6 +257,7 @@ class StatusController extends Controller
 			$share->save();
 			$count++;
 			SharePipeline::dispatch($share);
+			ReblogService::add($profile->id, $status->id);
 		}
 
 		Cache::forget('status:'.$status->id.':sharedby:userid:'.$user->id);
